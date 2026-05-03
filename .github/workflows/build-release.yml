@@ -1,0 +1,60 @@
+name: Build and Release APK
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        shell: bash
+        run: sdkmanager "platforms;android-31" "build-tools;34.0.0"
+
+      - name: Build signed APK
+        shell: pwsh
+        env:
+          ANDROID_BUILD_TOOLS_VERSION: "34.0.0"
+          ANDROID_PLATFORM: android-31
+        run: ./build.ps1
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: amap-companion-apk
+          path: amap_companion_signed.apk
+
+      - name: Publish GitHub Release
+        if: github.ref == 'refs/heads/master'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          tag="apk-${GITHUB_RUN_NUMBER}-${short_sha}"
+          apk_name="amap-companion-${short_sha}.apk"
+          cp amap_companion_signed.apk "$apk_name"
+          gh release create "$tag" "$apk_name" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "AMap Companion ${short_sha}" \
+            --notes "Automated APK build for commit ${GITHUB_SHA}."
