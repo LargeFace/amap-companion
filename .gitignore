@@ -1,7 +1,7 @@
 build/
-*.apk
-*.idsig
-*.png
+/*.apk
+/*.idsig
+/*.png
 backup/
 debug.keystore
 release.keystore
