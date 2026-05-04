@@ -14,11 +14,14 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,16 +32,24 @@ import java.util.List;
 public class MainActivity extends Activity {
     static final String PREFS = "amap_companion";
     static final String KEY_TARGET_PACKAGE = "target_package";
+    static final String KEY_UPDATE_URL = "update_url";
     static final String DEFAULT_TARGET_PACKAGE = "com.autonavi.amapClone";
+    static final String DEFAULT_UPDATE_URL = "";
     private static final String TARGET_PACKAGE_PREFIX = "com.autonavi.";
 
     private TextView targetText;
+    private TextView updateText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(buildContent());
         startOverlayService();
+        targetText.postDelayed(() -> {
+            if (!TextUtils.isEmpty(getUpdateUrl())) {
+                checkForUpdates(false);
+            }
+        }, 2000L);
     }
 
     private ScrollView buildContent() {
@@ -70,6 +81,15 @@ public class MainActivity extends Activity {
         hero.addView(targetText, targetLp);
         updateTargetText();
 
+        updateText = new TextView(this);
+        updateText.setTextSize(13f);
+        updateText.setTextColor(0xFFA7F3D0);
+        updateText.setLineSpacing(dp(2), 1.0f);
+        LinearLayout.LayoutParams updateLp = new LinearLayout.LayoutParams(-1, -2);
+        updateLp.setMargins(0, dp(8), 0, 0);
+        hero.addView(updateText, updateLp);
+        updateUpdateText("\u66f4\u65b0\u670d\u52a1\u5668\n" + displayUpdateUrl());
+
         LinearLayout controls = card(Color.WHITE);
         LinearLayout.LayoutParams controlsLp = new LinearLayout.LayoutParams(-1, -2);
         controlsLp.setMargins(0, dp(14), 0, 0);
@@ -80,6 +100,8 @@ public class MainActivity extends Activity {
         controls.addView(button("\u542f\u52a8\u60ac\u6d6e\u7a97", v -> startOverlayService(), 0xFF0F766E));
         controls.addView(button("\u5173\u95ed\u60ac\u6d6e\u7a97", v -> stopOverlayService(), 0xFFB45309));
         controls.addView(button("\u6253\u5f00\u76ee\u6807\u5e94\u7528", v -> openTargetApp(), 0xFF111827));
+        controls.addView(button("\u8bbe\u7f6e\u66f4\u65b0\u5730\u5740", v -> editUpdateUrl(), 0xFF334155));
+        controls.addView(button("\u68c0\u67e5\u66f4\u65b0", v -> checkForUpdates(true), 0xFF059669));
 
         return scroll;
     }
@@ -222,11 +244,118 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void editUpdateUrl() {
+        EditText input = new EditText(this);
+        input.setSingleLine(false);
+        input.setMinLines(2);
+        input.setText(getUpdateUrl());
+        input.setHint("http://your-server:8787/update.json");
+        new AlertDialog.Builder(this)
+                .setTitle("\u8bbe\u7f6e\u66f4\u65b0\u5730\u5740")
+                .setView(input)
+                .setPositiveButton("\u4fdd\u5b58", (dialog, which) -> {
+                    saveUpdateUrl(input.getText().toString().trim());
+                    updateUpdateText("\u66f4\u65b0\u670d\u52a1\u5668\n" + displayUpdateUrl());
+                })
+                .setNegativeButton("\u53d6\u6d88", null)
+                .show();
+    }
+
+    private void checkForUpdates(boolean manual) {
+        String url = getUpdateUrl();
+        if (TextUtils.isEmpty(url)) {
+            if (manual) {
+                Toast.makeText(this, "\u8bf7\u5148\u8bbe\u7f6e\u66f4\u65b0\u5730\u5740", Toast.LENGTH_SHORT).show();
+                editUpdateUrl();
+            }
+            return;
+        }
+        updateUpdateText("\u6b63\u5728\u68c0\u67e5\u66f4\u65b0...\n" + url);
+        new Thread(() -> {
+            try {
+                Updater.UpdateInfo info = Updater.check(this, url);
+                runOnUiThread(() -> handleUpdateInfo(info, manual));
+            } catch (Throwable t) {
+                runOnUiThread(() -> updateUpdateText("\u66f4\u65b0\u5931\u8d25: " + t.getMessage()));
+            }
+        }).start();
+    }
+
+    private void handleUpdateInfo(Updater.UpdateInfo info, boolean manual) {
+        if (!info.hasUpdate()) {
+            updateUpdateText("\u5df2\u662f\u6700\u65b0\u7248\n" + info.localVersionName + " (" + info.localVersionCode + ")");
+            if (manual) {
+                Toast.makeText(this, "\u5df2\u662f\u6700\u65b0\u7248", Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
+        updateUpdateText("\u53d1\u73b0\u65b0\u7248\n" + info.remoteVersionName + " (" + info.remoteVersionCode + ")");
+        if (manual) {
+            showUpdateDetail(info);
+        }
+    }
+
+    private void showUpdateDetail(Updater.UpdateInfo info) {
+        new AlertDialog.Builder(this)
+                .setTitle("\u53d1\u73b0\u65b0\u7248")
+                .setMessage(info.detailText())
+                .setPositiveButton("\u66f4\u65b0", (dialog, which) -> chooseInstallMode(info))
+                .setNegativeButton("\u53d6\u6d88", null)
+                .show();
+    }
+
+    private void chooseInstallMode(Updater.UpdateInfo info) {
+        String[] modes = new String[]{
+                "pm install\uff08\u5199\u5165 /data/local/tmp \u540e\u5b89\u88c5\uff09",
+                "adb install\uff08\u5199\u5165 /data/local/tmp \u540e\u5b89\u88c5\uff09",
+                "\u7cfb\u7edf\u5b89\u88c5\u5668",
+                "\u8bbe\u5907\u7ba1\u7406\u5458\uff08\u5c1a\u672a\u5b9e\u73b0\uff09"
+        };
+        Updater.InstallMode[] values = new Updater.InstallMode[]{
+                Updater.InstallMode.PM_INSTALL,
+                Updater.InstallMode.ADB_INSTALL,
+                Updater.InstallMode.SYSTEM_INSTALLER,
+                Updater.InstallMode.DEVICE_OWNER
+        };
+        new AlertDialog.Builder(this)
+                .setTitle("\u9009\u62e9\u5b89\u88c5\u65b9\u5f0f")
+                .setItems(modes, (dialog, which) -> installUpdate(info, values[which]))
+                .show();
+    }
+
+    private void installUpdate(Updater.UpdateInfo info, Updater.InstallMode mode) {
+        updateUpdateText("\u51c6\u5907\u66f4\u65b0...\n" + info.remoteVersionName + " (" + info.remoteVersionCode + ")");
+        new Thread(() -> Updater.install(this, info, mode,
+                message -> runOnUiThread(() -> updateUpdateText(message)))).start();
+    }
+
+    private void updateUpdateText(String text) {
+        if (updateText != null) {
+            updateText.setText(text);
+        }
+    }
+
     private void saveTargetPackage(String packageName) {
         getSharedPreferences(PREFS, MODE_PRIVATE)
                 .edit()
                 .putString(KEY_TARGET_PACKAGE, packageName)
                 .apply();
+    }
+
+    private void saveUpdateUrl(String url) {
+        getSharedPreferences(PREFS, MODE_PRIVATE)
+                .edit()
+                .putString(KEY_UPDATE_URL, url == null ? "" : url)
+                .apply();
+    }
+
+    private String getUpdateUrl() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_UPDATE_URL, DEFAULT_UPDATE_URL);
+    }
+
+    private String displayUpdateUrl() {
+        String url = getUpdateUrl();
+        return TextUtils.isEmpty(url) ? "\u672a\u8bbe\u7f6e" : url;
     }
 
     static String getTargetPackage(android.content.Context context) {

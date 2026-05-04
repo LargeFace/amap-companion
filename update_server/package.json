@@ -1,0 +1,14 @@
+{
+  "name": "amap-companion-update-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simple update server for AMap Companion APK releases.",
+  "scripts": {
+    "start": "node server.js",
+    "sync": "node sync-build.js",
+    "sync:force": "node sync-build.js --force"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

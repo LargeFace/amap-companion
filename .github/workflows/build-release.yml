@@ -30,12 +30,63 @@ jobs:
         shell: bash
         run: sdkmanager "platforms;android-31" "build-tools;34.0.0"
 
+      - name: Prepare version
+        id: version
+        shell: bash
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          version_code="$(date -u +%s)"
+          version_name="$(date -u +%Y%m%d)-${short_sha}"
+          echo "SHORT_SHA=${short_sha}" >> "$GITHUB_ENV"
+          echo "APP_VERSION_CODE=${version_code}" >> "$GITHUB_ENV"
+          echo "APP_VERSION_NAME=${version_name}" >> "$GITHUB_ENV"
+          echo "version_code=${version_code}" >> "$GITHUB_OUTPUT"
+          echo "version_name=${version_name}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${short_sha}" >> "$GITHUB_OUTPUT"
+
       - name: Build signed APK
         shell: pwsh
         env:
           ANDROID_BUILD_TOOLS_VERSION: "34.0.0"
           ANDROID_PLATFORM: android-31
+          APP_VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          APP_VERSION_NAME: ${{ steps.version.outputs.version_name }}
         run: ./build.ps1
+
+      - name: Generate release metadata
+        shell: bash
+        run: |
+          changelog="$(git log -20 --pretty=format:'- %h %s')"
+          {
+            echo "# AMap Companion 更新日志"
+            echo
+            echo "## ${APP_VERSION_NAME}"
+            echo
+            echo "- VersionCode: ${APP_VERSION_CODE}"
+            echo "- Commit: ${GITHUB_SHA}"
+            echo "- BuiltAt: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo
+            echo "${changelog}"
+          } > CHANGELOG.md
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          changelog = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+          items = [line[2:] for line in changelog if line.startswith("- ") and not line.startswith("- VersionCode:") and not line.startswith("- Commit:") and not line.startswith("- BuiltAt:")]
+          data = {
+              "packageName": "com.autonavi.companion",
+              "versionCode": int(os.environ["APP_VERSION_CODE"]),
+              "versionName": os.environ["APP_VERSION_NAME"],
+              "force": False,
+              "changelog": items,
+              "commit": os.environ["GITHUB_SHA"],
+              "builtAt": os.popen("date -u +%Y-%m-%dT%H:%M:%SZ").read().strip(),
+              "assetName": f"amap-companion-{os.environ['SHORT_SHA']}.apk"
+          }
+          pathlib.Path("release-update.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          PY
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -49,12 +100,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          short_sha="${GITHUB_SHA::7}"
-          tag="apk-${GITHUB_RUN_NUMBER}-${short_sha}"
-          apk_name="amap-companion-${short_sha}.apk"
+          tag="apk-${APP_VERSION_CODE}-${SHORT_SHA}"
+          apk_name="amap-companion-${SHORT_SHA}.apk"
           cp amap_companion_signed.apk "$apk_name"
-          gh release create "$tag" "$apk_name" \
+          gh release create "$tag" "$apk_name" release-update.json CHANGELOG.md \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "AMap Companion ${short_sha}" \
-            --notes "Automated APK build for commit ${GITHUB_SHA}."
+            --title "AMap Companion ${APP_VERSION_NAME}" \
+            --notes-file CHANGELOG.md

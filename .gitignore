@@ -5,3 +5,7 @@ build/
 backup/
 debug.keystore
 release.keystore
+update_server/public/apk/*.apk
+update_server/public/update.json
+update_server/public/CHANGELOG.md
+update_server/state/

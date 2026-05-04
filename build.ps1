@@ -72,6 +72,8 @@ $genDir = Join-Path $buildDir 'gen'
 $classesDir = Join-Path $buildDir 'classes'
 $dexDir = Join-Path $buildDir 'dex'
 $sourcesFile = Join-Path $buildDir 'sources.txt'
+$manifestSource = Join-Path $root 'app/src/main/AndroidManifest.xml'
+$manifestBuild = Join-Path $buildDir 'AndroidManifest.xml'
 $buildDirFull = [System.IO.Path]::GetFullPath($buildDir).TrimEnd(
     [System.IO.Path]::DirectorySeparatorChar,
     [System.IO.Path]::AltDirectorySeparatorChar
@@ -96,7 +98,16 @@ foreach ($full in @($genDir, $classesDir, $dexDir)) {
     New-Item -ItemType Directory -Force -Path $full | Out-Null
 }
 
-& $aapt package -f -m -J $genDir -M app/src/main/AndroidManifest.xml -S app/src/main/res -I $androidJar
+$manifestText = [System.IO.File]::ReadAllText($manifestSource)
+if ($env:APP_VERSION_CODE) {
+    $manifestText = $manifestText -replace 'android:versionCode="[^"]*"', ('android:versionCode="' + $env:APP_VERSION_CODE + '"')
+}
+if ($env:APP_VERSION_NAME) {
+    $manifestText = $manifestText -replace 'android:versionName="[^"]*"', ('android:versionName="' + $env:APP_VERSION_NAME + '"')
+}
+[System.IO.File]::WriteAllText($manifestBuild, $manifestText, (New-Object System.Text.UTF8Encoding($false)))
+
+& $aapt package -f -m -J $genDir -M $manifestBuild -S app/src/main/res -I $androidJar
 Check-Last 'aapt generate R'
 
 $sources = @()
@@ -113,7 +124,7 @@ Check-Last 'd8'
 
 $unsignedApk = Join-Path $buildDir 'amap_companion_unsigned.apk'
 $alignedApk = Join-Path $buildDir 'amap_companion_aligned.apk'
-& $aapt package -f -M app/src/main/AndroidManifest.xml -S app/src/main/res -I $androidJar -F $unsignedApk $dexDir
+& $aapt package -f -M $manifestBuild -S app/src/main/res -I $androidJar -F $unsignedApk $dexDir
 Check-Last 'aapt package'
 
 & $zipalign -f 4 $unsignedApk $alignedApk

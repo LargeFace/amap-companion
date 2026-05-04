@@ -1,0 +1,15 @@
+[Unit]
+Description=Sync GitHub Release APK for AMap Companion
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/amap-companion/update_server
+Environment=BRANCH=master
+Environment=REPO_DIR=/opt/amap-companion
+# Set this when the repo cannot be detected from git remote.
+# Environment=GITHUB_REPO=your-name/your-repo
+# Environment=GITHUB_TOKEN=ghp_xxx
+ExecStart=/usr/bin/node sync-build.js
+User=pi

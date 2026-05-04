@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically sync and build AMap Companion APK
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=amap-companion-sync.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

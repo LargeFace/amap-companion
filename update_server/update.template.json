@@ -1,0 +1,10 @@
+{
+  "packageName": "com.autonavi.companion",
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "apkPath": "apk/amap_companion_signed.apk",
+  "force": false,
+  "changelog": [
+    "初始版本"
+  ]
+}

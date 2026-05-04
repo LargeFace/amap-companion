@@ -1,0 +1,18 @@
+[Unit]
+Description=AMap Companion update server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/amap-companion/update_server
+Environment=HOST=0.0.0.0
+Environment=PORT=8787
+# Environment=PUBLIC_BASE_URL=http://your-pi:8787
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+User=pi
+
+[Install]
+WantedBy=multi-user.target
