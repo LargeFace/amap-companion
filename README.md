@@ -1,32 +1,65 @@
 # AMap Companion
 
-AMap Companion is a lightweight Android overlay for AMap Auto broadcast data.
-It listens for navigation/cruise broadcasts and displays turn hints, traffic
-light countdowns, lane information, ETA, road alerts, and protocol details in a
-movable floating window.
+AMap Companion 是一个用于高德地图车机版广播数据的 Android 悬浮窗辅助应用。
 
-## Features
+它会监听导航和巡航相关广播，并在可拖动悬浮窗中显示转向提示、红绿灯倒计时、车道信息、目的地、预计到达信息、道路提醒、电子眼提示、速度和部分协议详情。
 
-- Movable floating overlay with tap-to-open behavior.
-- User-selectable target package for protocol requests.
-- Navigation and cruise status display.
-- Dedicated lane information panel using AMapAuto `KEY_TYPE=13012` lane icon IDs.
-- Capsule-shaped traffic-light countdowns.
-- ETA, destination name when broadcast by AMap, speed, road alerts, camera,
-  road type, and limited location/status details.
+> 本项目由 AI 编写和维护，代码与文档可能仍需要结合真实设备环境继续验证。
 
-## Build
+## 主要功能
 
-This project is intentionally small and does not use Gradle. Use the bundled
-Android SDK tools on this Windows machine:
+- 可拖动悬浮窗，点击悬浮窗可打开主界面。
+- 支持用户自主选择目标应用包名，用于协议请求和广播交互。
+- 支持导航模式和巡航模式状态展示。
+- 支持显示高德 AMapAuto 广播协议中的车道信息。
+- 使用高德风格车道图标资源渲染复杂车道，避免简单箭头复用导致的重叠和难以辨认。
+- 红绿灯倒计时使用醒目的胶囊样式，并支持显示方向相关红绿灯信息。
+- 支持显示目的地名称、剩余时间、剩余距离、当前道路、速度、道路类型、电子眼和道路提醒等信息。
+- 支持查看部分协议字段，便于调试高德车机版广播数据。
+
+## 构建方式
+
+本项目保持轻量化，没有使用 Gradle，直接通过 Android SDK build-tools 构建。
+
+在 Windows 本机执行：
 
 ```powershell
 .\build.ps1
 ```
 
-The script produces `amap_companion_signed.apk` using `debug.keystore`.
+构建完成后会生成：
 
-## Signing
+```text
+amap_companion_signed.apk
+```
 
-See `SIGNING.md`. Keep using `debug.keystore` to allow upgrade installs over
-the current device build.
+## 自动构建与发布
+
+仓库已配置 GitHub Actions。
+
+每次向 `master` 分支推送代码后，GitHub Actions 会自动：
+
+- 安装 Android SDK 和 build-tools。
+- 构建并签名 APK。
+- 上传 APK artifact。
+- 创建 GitHub Release，并附带可安装的 APK 文件。
+
+也可以在 GitHub Actions 页面手动触发构建。
+
+## 签名说明
+
+当前 APK 使用仓库中的 `debug.keystore` 签名，以便后续构建可以覆盖安装到同一设备上的旧版本。
+
+签名信息说明见：
+
+```text
+SIGNING.md
+```
+
+请不要随意替换 `debug.keystore`，否则已安装版本可能无法直接升级覆盖。
+
+## 适用场景
+
+本应用主要用于配合高德地图车机版广播协议进行悬浮窗显示和调试。
+
+如果使用虚拟定位、修改版高德车机版或不同系统 ROM，广播字段和权限行为可能存在差异，需要结合实际环境测试。
