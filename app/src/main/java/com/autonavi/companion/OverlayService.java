@@ -42,7 +42,8 @@ public class OverlayService extends Service {
     private static final String ACTION_SEND = "AUTONAVI_STANDARD_BROADCAST_SEND";
     private static final String ACTION_RECV = "AUTONAVI_STANDARD_BROADCAST_RECV";
     private static final int KEY_TRAFFIC_LIGHT_COUNTDOWN = 60073;
-    private static final long ALERT_TTL_MS = 15000L;
+    private static final long ALERT_TTL_MS = 5000L;
+    private static final long LIGHT_TTL_MS = 4500L;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private WindowManager windowManager;
@@ -65,6 +66,7 @@ public class OverlayService extends Service {
     private boolean dragging;
     private String lastDetailedMode;
     private long alertUpdatedAt;
+    private int navigationTurnDir = -1;
 
     private final Runnable lanePoll = new Runnable() {
         @Override
@@ -404,6 +406,7 @@ public class OverlayService extends Service {
         } else if (keyType == 10019 && state == 25) {
             mode = "\u5de1\u822a\u5df2\u9000\u51fa";
             inCruiseMode = false;
+            navigationTurnDir = -1;
             lastDetailedMode = null;
         } else if (keyType == 10019 && state == 8) {
             mode = "\u5bfc\u822a";
@@ -411,6 +414,7 @@ public class OverlayService extends Service {
         } else if (keyType == 10019 && state == 9) {
             mode = "\u5bfc\u822a\u5df2\u9000\u51fa";
             inCruiseMode = false;
+            navigationTurnDir = -1;
             if (etaText != null) {
                 etaText.setVisibility(View.GONE);
             }
@@ -476,6 +480,7 @@ public class OverlayService extends Service {
             turnText.setVisibility(View.GONE);
             return;
         }
+        navigationTurnDir = turnIconToTrafficDir(icon);
         String distance = valueString(extras, "SEG_REMAIN_DIS_AUTO", "NEXT_SEG_REMAIN_DIS_AUTO");
         if (TextUtils.isEmpty(distance)) {
             int meters = intValue(extras, "SEG_REMAIN_DIS", intValue(extras, "NEXT_SEG_REMAIN_DIS", -1));
@@ -510,11 +515,14 @@ public class OverlayService extends Service {
             renderTrafficLights();
             return;
         }
-        if (updateTrafficLightsFromJson(extras)) {
+        HashMap<Integer, LightState> nextLights = new HashMap<>();
+        if (updateTrafficLightsFromJson(extras, nextLights)) {
+            replaceTrafficLights(nextLights);
             renderTrafficLights();
             return;
         }
-        if (updateDirectionalTrafficLights(extras)) {
+        if (updateDirectionalTrafficLights(extras, nextLights)) {
+            replaceTrafficLights(nextLights);
             renderTrafficLights();
             return;
         }
@@ -542,12 +550,11 @@ public class OverlayService extends Service {
             int green = valueAt(greens, i, intValue(extras, "greenLightLastSecond", 0));
             int seconds = red > 0 ? red : green;
             int key = dir >= 0 ? dir : 999;
-            if (seconds <= 0) {
-                trafficLights.remove(key);
-                continue;
+            if (seconds > 0) {
+                putLightState(nextLights, key, dir, status, red, green, seconds);
             }
-            putLightState(key, dir, status, red, green, seconds);
         }
+        replaceTrafficLights(nextLights);
         renderTrafficLights();
     }
 
@@ -561,7 +568,7 @@ public class OverlayService extends Service {
                 "trafficLight", "trafficLightInfo", "trafficLightsCountdownInfo");
     }
 
-    private boolean updateTrafficLightsFromJson(Bundle extras) {
+    private boolean updateTrafficLightsFromJson(Bundle extras, HashMap<Integer, LightState> target) {
         boolean handled = false;
         for (String key : extras.keySet()) {
             Object value = extras.get(key);
@@ -572,7 +579,7 @@ public class OverlayService extends Service {
             if (TextUtils.isEmpty(text) || !looksLikeTrafficLightPayload(key, text)) {
                 continue;
             }
-            handled |= parseTrafficLightPayload(text);
+            handled |= parseTrafficLightPayload(text, target);
         }
         return handled;
     }
@@ -587,7 +594,7 @@ public class OverlayService extends Service {
                 || lowerText.contains("trafficlightstatus");
     }
 
-    private boolean parseTrafficLightPayload(String text) {
+    private boolean parseTrafficLightPayload(String text, HashMap<Integer, LightState> target) {
         try {
             String trimmed = text.trim();
             if (trimmed.startsWith("[")) {
@@ -596,13 +603,13 @@ public class OverlayService extends Service {
                 for (int i = 0; i < array.length(); i++) {
                     JSONObject item = array.optJSONObject(i);
                     if (item != null) {
-                        handled |= parseTrafficLightObject(item);
+                        handled |= parseTrafficLightObject(item, target);
                     }
                 }
                 return handled;
             }
             if (trimmed.startsWith("{")) {
-                return parseTrafficLightObject(new JSONObject(trimmed));
+                return parseTrafficLightObject(new JSONObject(trimmed), target);
             }
         } catch (Throwable t) {
             Log.d(TAG, "traffic light payload parse skipped: " + text);
@@ -610,7 +617,7 @@ public class OverlayService extends Service {
         return false;
     }
 
-    private boolean parseTrafficLightObject(JSONObject object) {
+    private boolean parseTrafficLightObject(JSONObject object, HashMap<Integer, LightState> target) {
         boolean handled = false;
         JSONArray lights = object.optJSONArray("trafficLights");
         if (lights == null) {
@@ -623,7 +630,7 @@ public class OverlayService extends Service {
             for (int i = 0; i < lights.length(); i++) {
                 JSONObject item = lights.optJSONObject(i);
                 if (item != null) {
-                    handled |= parseTrafficLightObject(item);
+                    handled |= parseTrafficLightObject(item, target);
                 }
             }
         }
@@ -639,30 +646,30 @@ public class OverlayService extends Service {
         int seconds = red > 0 ? red : green;
         if (seconds > 0) {
             int key = dir >= 0 ? dir : 999;
-            putLightState(key, dir, status, red, green, seconds);
+            putLightState(target, key, dir, status, red, green, seconds);
             handled = true;
         }
         return handled;
     }
 
-    private boolean updateDirectionalTrafficLights(Bundle extras) {
+    private boolean updateDirectionalTrafficLights(Bundle extras, HashMap<Integer, LightState> target) {
         boolean handled = false;
-        handled |= putDirectionalLight(extras, 1, "leftRedLightCountDownSeconds",
+        handled |= putDirectionalLight(target, extras, 1, "leftRedLightCountDownSeconds",
                 "LEFT_RED_LIGHT_COUNT_DOWN_SECONDS", "leftRedSeconds");
-        handled |= putDirectionalLight(extras, 4, "straightRedLightCountDownSeconds",
+        handled |= putDirectionalLight(target, extras, 4, "straightRedLightCountDownSeconds",
                 "STRAIGHT_RED_LIGHT_COUNT_DOWN_SECONDS", "straightRedSeconds", "frontRedSeconds");
-        handled |= putDirectionalLight(extras, 2, "rightRedLightCountDownSeconds",
+        handled |= putDirectionalLight(target, extras, 2, "rightRedLightCountDownSeconds",
                 "RIGHT_RED_LIGHT_COUNT_DOWN_SECONDS", "rightRedSeconds");
-        handled |= putDirectionalLight(extras, 1, "leftGreenLightLastSecond",
+        handled |= putDirectionalLight(target, extras, 1, "leftGreenLightLastSecond",
                 "LEFT_GREEN_LIGHT_LAST_SECOND", "leftGreenSeconds");
-        handled |= putDirectionalLight(extras, 4, "straightGreenLightLastSecond",
+        handled |= putDirectionalLight(target, extras, 4, "straightGreenLightLastSecond",
                 "STRAIGHT_GREEN_LIGHT_LAST_SECOND", "straightGreenSeconds", "frontGreenSeconds");
-        handled |= putDirectionalLight(extras, 2, "rightGreenLightLastSecond",
+        handled |= putDirectionalLight(target, extras, 2, "rightGreenLightLastSecond",
                 "RIGHT_GREEN_LIGHT_LAST_SECOND", "rightGreenSeconds");
         return handled;
     }
 
-    private boolean putDirectionalLight(Bundle extras, int dir, String... keys) {
+    private boolean putDirectionalLight(HashMap<Integer, LightState> target, Bundle extras, int dir, String... keys) {
         int seconds = intValue(extras, keys[0], 0);
         for (int i = 1; i < keys.length && seconds <= 0; i++) {
             seconds = intValue(extras, keys[i], 0);
@@ -671,19 +678,42 @@ public class OverlayService extends Service {
             return false;
         }
         int status = keys[0].toLowerCase(java.util.Locale.US).contains("green") ? 4 : 1;
-        putLightState(dir >= 0 ? dir : 999, dir, status, status == 1 ? seconds : 0,
+        putLightState(target, dir >= 0 ? dir : 999, dir, status, status == 1 ? seconds : 0,
                 status == 4 ? seconds : 0, seconds);
         return true;
     }
 
     private void putLightState(int key, int dir, int status, int red, int green, int seconds) {
+        putLightState(trafficLights, key, dir, status, red, green, seconds);
+    }
+
+    private void putLightState(HashMap<Integer, LightState> target, int key, int dir,
+                               int status, int red, int green, int seconds) {
         LightState state = new LightState();
         state.dir = dir;
         state.status = status;
         state.seconds = seconds;
         state.color = colorForStatus(status, red, green);
         state.updatedAt = System.currentTimeMillis();
-        trafficLights.put(key, state);
+        LightState old = target.get(key);
+        if (old == null || preferLightState(state, old)) {
+            target.put(key, state);
+        }
+    }
+
+    private boolean preferLightState(LightState candidate, LightState old) {
+        if (old.status == 1 && candidate.status != 1) {
+            return false;
+        }
+        if (candidate.status == 1 && old.status != 1) {
+            return true;
+        }
+        return candidate.seconds > 0;
+    }
+
+    private void replaceTrafficLights(HashMap<Integer, LightState> nextLights) {
+        trafficLights.clear();
+        trafficLights.putAll(nextLights);
     }
 
     private void renderTrafficLights() {
@@ -691,30 +721,61 @@ public class OverlayService extends Service {
         Iterator<Map.Entry<Integer, LightState>> iterator = trafficLights.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<Integer, LightState> entry = iterator.next();
-            if (now - entry.getValue().updatedAt > 15000L) {
+            if (now - entry.getValue().updatedAt > LIGHT_TTL_MS) {
                 iterator.remove();
             }
         }
         if (trafficLights.isEmpty()) {
+            lightRow.removeAllViews();
             lightRow.setVisibility(View.GONE);
             return;
         }
 
         ArrayList<Integer> keys = new ArrayList<>(trafficLights.keySet());
         Collections.sort(keys, (a, b) -> directionPriority(a) - directionPriority(b));
+        if (!inCruiseMode && keys.size() > 1) {
+            Integer preferred = preferredNavigationLightKey(keys);
+            keys.clear();
+            if (preferred != null) {
+                keys.add(preferred);
+            }
+        }
         lightRow.removeAllViews();
+        boolean showDirectionLabel = inCruiseMode && keys.size() > 1;
         for (Integer key : keys) {
             LightState state = trafficLights.get(key);
             if (state == null) {
                 continue;
             }
-            lightRow.addView(lightPill(state));
+            lightRow.addView(lightPill(state, showDirectionLabel));
         }
         lightRow.setVisibility(lightRow.getChildCount() > 0 ? View.VISIBLE : View.GONE);
         panel.setVisibility(View.VISIBLE);
     }
 
-    private TextView lightPill(LightState state) {
+    private Integer preferredNavigationLightKey(ArrayList<Integer> keys) {
+        if (navigationTurnDir >= 0 && trafficLights.containsKey(navigationTurnDir)) {
+            return navigationTurnDir;
+        }
+        Integer best = null;
+        for (Integer key : keys) {
+            LightState state = trafficLights.get(key);
+            if (state == null) {
+                continue;
+            }
+            if (best == null) {
+                best = key;
+                continue;
+            }
+            LightState old = trafficLights.get(best);
+            if (old == null || state.seconds < old.seconds) {
+                best = key;
+            }
+        }
+        return best;
+    }
+
+    private TextView lightPill(LightState state, boolean showDirectionLabel) {
         TextView view = new TextView(this);
         view.setTextColor(Color.WHITE);
         view.setTextSize(20f);
@@ -723,8 +784,7 @@ public class OverlayService extends Service {
         view.setMinWidth(dp(inCruiseMode ? 62 : 54));
         view.setMinHeight(dp(34));
         view.setPadding(dp(12), 0, dp(12), dp(1));
-        String label = state.dir >= 0 && (inCruiseMode || trafficLights.size() > 1)
-                ? directionLabel(state.dir) : "";
+        String label = showDirectionLabel && state.dir >= 0 ? directionLabel(state.dir) : "";
         view.setText(label + state.seconds + "s");
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(state.color);
@@ -773,15 +833,31 @@ public class OverlayService extends Service {
         return "\u2191";
     }
 
+    private int turnIconToTrafficDir(int icon) {
+        if (icon == 2 || icon == 4 || icon == 6) {
+            return 1;
+        }
+        if (icon == 3 || icon == 5 || icon == 7 || icon == 19) {
+            return 2;
+        }
+        if (icon == 8 || icon == 10 || icon == 11 || icon == 12) {
+            return 0;
+        }
+        return 4;
+    }
+
     private int colorForStatus(int status, int red, int green) {
-        if (status == 1) {
+        if (red > 0) {
             return 0xFFFF3B30;
+        }
+        if (status == 2 || status == 3 || status == 5 || status == 6 || status == 0) {
+            return 0xFFFFCC00;
         }
         if (status == 4) {
             return 0xFF34C759;
         }
-        if (status == 2 || status == 3 || status == 5 || status == 6 || status == 0) {
-            return 0xFFFFCC00;
+        if (status == 1) {
+            return 0xFFFF3B30;
         }
         if (green > 0 && red <= 0) {
             return 0xFF34C759;
@@ -936,7 +1012,8 @@ public class OverlayService extends Service {
             parts.add(sapa.toString());
         }
 
-        int lightNum = intValue(extras, "TRAFFIC_LIGHT_NUM", -1);
+        int lightNum = intValue(extras, "routeRemainTrafficLightNum",
+                intValue(extras, "TRAFFIC_LIGHT_NUM", -1));
         if (lightNum > 0) {
             parts.add("\u7ea2\u7eff\u706f " + lightNum + "\u4e2a");
         }
@@ -978,13 +1055,11 @@ public class OverlayService extends Service {
         }
 
         int direction = intValue(extras, "CAR_DIRECTION", -1);
-        boolean hasCoordinateKeys = hasAny(extras, "CAR_LATITUDE", "CAR_LONGITUDE",
-                "LAT", "LON", "LATITUDE", "LONGITUDE");
         double lat = doubleValue(extras, "CAR_LATITUDE",
                 doubleValue(extras, "LAT", doubleValue(extras, "LATITUDE", Double.NaN)));
         double lon = doubleValue(extras, "CAR_LONGITUDE",
                 doubleValue(extras, "LON", doubleValue(extras, "LONGITUDE", Double.NaN)));
-        if (direction >= 0 || (!Double.isNaN(lat) && !Double.isNaN(lon)) || hasCoordinateKeys) {
+        if (direction >= 0 || (!Double.isNaN(lat) && !Double.isNaN(lon) && !(lat == 0.0d && lon == 0.0d))) {
             StringBuilder car = new StringBuilder();
             if (direction >= 0) {
                 car.append("\u8f66\u5934 ").append(direction).append('\u00b0');
@@ -994,11 +1069,6 @@ public class OverlayService extends Service {
                     car.append("  ");
                 }
                 car.append(String.format(java.util.Locale.US, "%.5f, %.5f", lat, lon));
-            } else if (hasCoordinateKeys) {
-                if (car.length() > 0) {
-                    car.append("  ");
-                }
-                car.append("\u7ecf\u7eac\u5ea6\u672a\u900f\u51fa");
             }
             lines.add(car.toString());
         }

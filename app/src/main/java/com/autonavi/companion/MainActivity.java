@@ -30,6 +30,7 @@ public class MainActivity extends Activity {
     static final String PREFS = "amap_companion";
     static final String KEY_TARGET_PACKAGE = "target_package";
     static final String DEFAULT_TARGET_PACKAGE = "com.autonavi.amapClone";
+    private static final String TARGET_PACKAGE_PREFIX = "com.autonavi.";
 
     private TextView targetText;
 
@@ -131,6 +132,9 @@ public class MainActivity extends Activity {
                 continue;
             }
             String pkg = info.activityInfo.packageName;
+            if (!isAmapPackage(pkg)) {
+                continue;
+            }
             launcherPackages.add(pkg);
             if (pkg.equals(getPackageName())) {
                 continue;
@@ -144,7 +148,7 @@ public class MainActivity extends Activity {
         }
         for (ApplicationInfo appInfo : pm.getInstalledApplications(flags)) {
             String pkg = appInfo.packageName;
-            if (pkg == null || pkg.equals(getPackageName()) || !seen.add(pkg)) {
+            if (pkg == null || !isAmapPackage(pkg) || pkg.equals(getPackageName()) || !seen.add(pkg)) {
                 continue;
             }
             String label = String.valueOf(appInfo.loadLabel(pm));
@@ -159,7 +163,12 @@ public class MainActivity extends Activity {
             AppChoice choice = choices.get(i);
             String type = choice.system ? "\u7cfb\u7edf" : "\u7528\u6237";
             String launch = choice.launchable ? "\u53ef\u6253\u5f00" : "\u65e0\u684c\u9762\u56fe\u6807";
-            labels[i] = choice.label + "  ·  " + type + " · " + launch + "\n" + choice.packageName;
+            labels[i] = choice.label + "  \u00b7  " + type + "  \u00b7  " + launch + "\n" + choice.packageName;
+        }
+        if (choices.isEmpty()) {
+            choices.add(new AppChoice(DEFAULT_TARGET_PACKAGE, DEFAULT_TARGET_PACKAGE, false, false));
+            labels = new String[]{DEFAULT_TARGET_PACKAGE
+                    + "\n\u672a\u626b\u63cf\u5230 com.autonavi.* \u5e94\u7528\uff0c\u4f7f\u7528\u9ed8\u8ba4\u5305\u540d"};
         }
         new AlertDialog.Builder(this)
                 .setTitle("\u9009\u62e9\u76ee\u6807\u5e94\u7528")
@@ -173,6 +182,10 @@ public class MainActivity extends Activity {
 
     private boolean isSystemApp(ApplicationInfo appInfo) {
         return (appInfo.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0;
+    }
+
+    private boolean isAmapPackage(String packageName) {
+        return packageName != null && packageName.startsWith(TARGET_PACKAGE_PREFIX);
     }
 
     private void startOverlayService() {
