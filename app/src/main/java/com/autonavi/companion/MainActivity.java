@@ -17,6 +17,8 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -43,9 +45,17 @@ public class MainActivity extends Activity {
     static final String KEY_CLUSTER_X = "cluster_x";
     static final String KEY_CLUSTER_Y = "cluster_y";
     static final String KEY_CLUSTER_SCALE_PERCENT = "cluster_scale_percent";
+    static final String KEY_SHOW_MODE = "show_mode";
+    static final String KEY_SHOW_TURN = "show_turn";
+    static final String KEY_SHOW_LANE = "show_lane";
+    static final String KEY_SHOW_LIGHT = "show_light";
+    static final String KEY_SHOW_ETA = "show_eta";
+    static final String KEY_SHOW_ALERT = "show_alert";
+    static final String KEY_SHOW_DETAIL = "show_detail";
     static final String ACTION_MAIN_OVERLAY_CHANGED = "com.autonavi.companion.MAIN_OVERLAY_CHANGED";
     static final String ACTION_OVERLAY_SCALE_CHANGED = "com.autonavi.companion.OVERLAY_SCALE_CHANGED";
     static final String ACTION_CLUSTER_MIRROR_CHANGED = "com.autonavi.companion.CLUSTER_MIRROR_CHANGED";
+    static final String ACTION_OVERLAY_CONTENT_CHANGED = "com.autonavi.companion.OVERLAY_CONTENT_CHANGED";
     static final String DEFAULT_TARGET_PACKAGE = "com.autonavi.amapClone";
     static final String UPDATE_CHANNEL_SERVER = "server";
     static final String UPDATE_CHANNEL_GITHUB = "github";
@@ -64,6 +74,13 @@ public class MainActivity extends Activity {
     private TextView clusterScaleText;
     private FrameLayout overlayPreviewStage;
     private LinearLayout overlayPreviewPanel;
+    private TextView previewModeText;
+    private TextView previewTurnText;
+    private LinearLayout previewLightRow;
+    private LinearLayout previewLaneSection;
+    private TextView previewEtaText;
+    private TextView previewAlertText;
+    private TextView previewDetailText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -129,6 +146,7 @@ public class MainActivity extends Activity {
         controls.addView(button("\u68c0\u67e5\u66f4\u65b0", v -> checkForUpdates(true), 0xFF059669));
         addOverlayScaleControls(controls);
         addClusterMirrorControls(controls);
+        addOverlayContentControls(controls);
 
         return scroll;
     }
@@ -247,6 +265,46 @@ public class MainActivity extends Activity {
         parent.addView(box, lp);
     }
 
+    private void addOverlayContentControls(LinearLayout parent) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(2), dp(12), dp(2), 0);
+
+        TextView title = new TextView(this);
+        title.setText("\u81ea\u5b9a\u4e49\u60ac\u6d6e\u7a97\u5185\u5bb9");
+        title.setTextSize(14f);
+        title.setTextColor(0xFF111827);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        box.addView(title, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView hint = new TextView(this);
+        hint.setText("\u4e3b\u60ac\u6d6e\u7a97\u548c\u526f\u5c4f\u955c\u50cf\u4f1a\u540c\u6b65\u4f7f\u7528\u8fd9\u7ec4\u663e\u793a\u8bbe\u7f6e");
+        hint.setTextSize(12f);
+        hint.setTextColor(0xFF64748B);
+        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+        hintLp.setMargins(0, dp(6), 0, 0);
+        box.addView(hint, hintLp);
+
+        LinearLayout grid = new LinearLayout(this);
+        grid.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams gridLp = new LinearLayout.LayoutParams(-1, -2);
+        gridLp.setMargins(0, dp(6), 0, 0);
+        box.addView(grid, gridLp);
+
+        grid.addView(contentToggle("\u9876\u90e8\u72b6\u6001", KEY_SHOW_MODE));
+        grid.addView(contentToggle("\u8def\u7ebf\u6307\u5f15", KEY_SHOW_TURN));
+        grid.addView(contentToggle("\u7ea2\u7eff\u706f\u5012\u8ba1\u65f6", KEY_SHOW_LIGHT));
+        grid.addView(contentToggle("\u8f66\u9053\u4fe1\u606f", KEY_SHOW_LANE));
+        grid.addView(contentToggle("\u5269\u4f59\u91cc\u7a0b\u4e0e\u76ee\u7684\u5730", KEY_SHOW_ETA));
+        grid.addView(contentToggle("\u9650\u901f/\u7535\u5b50\u773c/\u7ea2\u7eff\u706f\u4e2a\u6570", KEY_SHOW_ALERT));
+        grid.addView(contentToggle("\u8be6\u7ec6\u72b6\u6001", KEY_SHOW_DETAIL));
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, dp(8), 0, 0);
+        parent.addView(box, lp);
+        updateOverlayPreviewContentVisibility();
+    }
+
     private void addOverlayPreview(LinearLayout parent) {
         overlayPreviewStage = new FrameLayout(this);
         overlayPreviewStage.setPadding(dp(10), dp(10), dp(10), dp(10));
@@ -345,68 +403,86 @@ public class MainActivity extends Activity {
         bg.setStroke(dp(1), 0x22FFFFFF);
         panel.setBackground(bg);
 
-        TextView mode = new TextView(this);
-        mode.setText("\u5bfc\u822a \u00b7 \u5357\u56db\u73af\u4e1c\u8def\u8f85\u8def \u00b7 39 km/h");
-        mode.setTextSize(6.5f);
-        mode.setTextColor(0xFFE8EAED);
-        mode.setSingleLine(true);
-        panel.addView(mode, new LinearLayout.LayoutParams(-2, -2));
+        previewModeText = new TextView(this);
+        previewModeText.setText("\u5bfc\u822a \u00b7 \u5357\u56db\u73af\u4e1c\u8def\u8f85\u8def \u00b7 39 km/h");
+        previewModeText.setTextSize(6.5f);
+        previewModeText.setTextColor(0xFFE8EAED);
+        previewModeText.setSingleLine(true);
+        panel.addView(previewModeText, new LinearLayout.LayoutParams(-2, -2));
 
-        TextView turn = new TextView(this);
-        turn.setText("\u2190  669\u7c73\n\u8fdb\u5165 \u6986\u4e61\u8def\u8f85\u8def");
-        turn.setTextSize(15f);
-        turn.setTypeface(Typeface.DEFAULT_BOLD);
-        turn.setGravity(Gravity.CENTER);
-        turn.setTextColor(Color.WHITE);
-        turn.setPadding(dp(12), dp(4), dp(12), dp(5));
+        previewTurnText = new TextView(this);
+        previewTurnText.setText("\u2190  669\u7c73\n\u8fdb\u5165 \u6986\u4e61\u8def\u8f85\u8def");
+        previewTurnText.setTextSize(15f);
+        previewTurnText.setTypeface(Typeface.DEFAULT_BOLD);
+        previewTurnText.setGravity(Gravity.CENTER);
+        previewTurnText.setTextColor(Color.WHITE);
+        previewTurnText.setPadding(dp(12), dp(4), dp(12), dp(5));
         GradientDrawable turnBg = new GradientDrawable();
         turnBg.setOrientation(GradientDrawable.Orientation.LEFT_RIGHT);
         turnBg.setColors(new int[]{0xFF1D4ED8, 0xFF0891B2});
         turnBg.setCornerRadius(dp(5));
-        turn.setBackground(turnBg);
+        previewTurnText.setBackground(turnBg);
         LinearLayout.LayoutParams turnLp = new LinearLayout.LayoutParams(-2, -2);
         turnLp.setMargins(0, dp(3), 0, dp(3));
-        panel.addView(turn, turnLp);
+        panel.addView(previewTurnText, turnLp);
 
-        LinearLayout lights = new LinearLayout(this);
-        lights.setOrientation(LinearLayout.HORIZONTAL);
-        lights.setGravity(Gravity.CENTER);
-        lights.addView(previewLight("\u2190 51s", 0xFFC62828));
-        lights.addView(previewLight("\u2191 18s", 0xFFC62828));
-        panel.addView(lights, new LinearLayout.LayoutParams(-2, -2));
+        previewLightRow = new LinearLayout(this);
+        previewLightRow.setOrientation(LinearLayout.HORIZONTAL);
+        previewLightRow.setGravity(Gravity.CENTER);
+        previewLightRow.addView(previewLight("\u2190 51s", 0xFFC62828));
+        previewLightRow.addView(previewLight("\u2191 18s", 0xFFC62828));
+        panel.addView(previewLightRow, new LinearLayout.LayoutParams(-2, -2));
 
-        LinearLayout laneSection = new LinearLayout(this);
-        laneSection.setOrientation(LinearLayout.VERTICAL);
-        laneSection.setGravity(Gravity.CENTER_HORIZONTAL);
-        laneSection.setPadding(dp(4), dp(3), dp(4), dp(4));
+        previewLaneSection = new LinearLayout(this);
+        previewLaneSection.setOrientation(LinearLayout.VERTICAL);
+        previewLaneSection.setGravity(Gravity.CENTER_HORIZONTAL);
+        previewLaneSection.setPadding(dp(4), dp(3), dp(4), dp(4));
         GradientDrawable laneBg = new GradientDrawable();
         laneBg.setColor(0xCC0F172A);
         laneBg.setCornerRadius(dp(5));
         laneBg.setStroke(dp(1), 0x1FFFFFFF);
-        laneSection.setBackground(laneBg);
+        previewLaneSection.setBackground(laneBg);
 
         TextView laneTitle = new TextView(this);
         laneTitle.setText("\u8f66\u9053\u4fe1\u606f");
         laneTitle.setTextSize(5.5f);
         laneTitle.setTextColor(0xFFBAE6FD);
         laneTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        laneSection.addView(laneTitle, new LinearLayout.LayoutParams(-2, -2));
+        previewLaneSection.addView(laneTitle, new LinearLayout.LayoutParams(-2, -2));
 
         LaneBarView laneBar = new LaneBarView(this);
         laneBar.setFrameScaleMultiplier(1f);
         laneBar.setScaleMultiplier(1.5f);
         laneBar.setLaneData(new int[]{15, 31, 18}, new boolean[]{true, false, true});
-        laneSection.addView(laneBar, new LinearLayout.LayoutParams(-2, -2));
+        previewLaneSection.addView(laneBar, new LinearLayout.LayoutParams(-2, -2));
         LinearLayout.LayoutParams laneLp = new LinearLayout.LayoutParams(-2, -2);
         laneLp.setMargins(0, dp(3), 0, dp(2));
-        panel.addView(laneSection, laneLp);
+        panel.addView(previewLaneSection, laneLp);
 
-        TextView eta = new TextView(this);
-        eta.setText("5.3\u516c\u91cc \u00b7 10\u5206\u949f\n\u9884\u8ba105:42\u5230\u8fbe\n\u76ee\u7684\u5730 \u5c0f\u7ea2\u95e8\u4e61\u515a\u7fa4\u670d\u52a1\u4e2d\u5fc3");
-        eta.setTextSize(7.5f);
-        eta.setTextColor(0xFFE8EAED);
-        eta.setGravity(Gravity.CENTER);
-        panel.addView(eta, new LinearLayout.LayoutParams(-2, -2));
+        previewEtaText = new TextView(this);
+        previewEtaText.setText("5.3\u516c\u91cc \u00b7 10\u5206\u949f\n\u9884\u8ba105:42\u5230\u8fbe\n\u76ee\u7684\u5730 \u5c0f\u7ea2\u95e8\u4e61\u515a\u7fa4\u670d\u52a1\u4e2d\u5fc3");
+        previewEtaText.setTextSize(7.5f);
+        previewEtaText.setTextColor(0xFFE8EAED);
+        previewEtaText.setGravity(Gravity.CENTER);
+        panel.addView(previewEtaText, new LinearLayout.LayoutParams(-2, -2));
+
+        previewAlertText = new TextView(this);
+        previewAlertText.setText("\u9650\u901f 50  \u00b7  \u7ea2\u7eff\u706f 2\u4e2a");
+        previewAlertText.setTextSize(6.5f);
+        previewAlertText.setTextColor(0xFFFFF7ED);
+        previewAlertText.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams alertLp = new LinearLayout.LayoutParams(-2, -2);
+        alertLp.setMargins(0, dp(3), 0, 0);
+        panel.addView(previewAlertText, alertLp);
+
+        previewDetailText = new TextView(this);
+        previewDetailText.setText("\u8f66\u5934 90\u00b0\n\u9053\u8def \u4e3b\u8981\u9053\u8def");
+        previewDetailText.setTextSize(5.8f);
+        previewDetailText.setTextColor(0xFFC7D2FE);
+        previewDetailText.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-2, -2);
+        detailLp.setMargins(0, dp(2), 0, 0);
+        panel.addView(previewDetailText, detailLp);
         return panel;
     }
 
@@ -767,6 +843,47 @@ public class MainActivity extends Activity {
         overlayPreviewStage.setLayoutParams(stageLp);
     }
 
+    private CheckBox contentToggle(String text, String key) {
+        CheckBox checkBox = new CheckBox(this);
+        checkBox.setText(text);
+        checkBox.setChecked(isOverlayContentEnabled(this, key));
+        checkBox.setTextSize(14f);
+        checkBox.setTextColor(0xFF0F172A);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            checkBox.setButtonTintList(android.content.res.ColorStateList.valueOf(0xFF2563EB));
+        }
+        checkBox.setPadding(0, dp(2), 0, dp(2));
+        checkBox.setOnCheckedChangeListener((CompoundButton buttonView, boolean isChecked) -> {
+            saveOverlayContentEnabled(key, isChecked);
+            updateOverlayPreviewContentVisibility();
+            notifyOverlayContentChanged();
+        });
+        return checkBox;
+    }
+
+    private void saveOverlayContentEnabled(String key, boolean enabled) {
+        getSharedPreferences(PREFS, MODE_PRIVATE)
+                .edit()
+                .putBoolean(key, enabled)
+                .apply();
+    }
+
+    private void updateOverlayPreviewContentVisibility() {
+        setPreviewVisibility(previewModeText, isOverlayContentEnabled(this, KEY_SHOW_MODE));
+        setPreviewVisibility(previewTurnText, isOverlayContentEnabled(this, KEY_SHOW_TURN));
+        setPreviewVisibility(previewLightRow, isOverlayContentEnabled(this, KEY_SHOW_LIGHT));
+        setPreviewVisibility(previewLaneSection, isOverlayContentEnabled(this, KEY_SHOW_LANE));
+        setPreviewVisibility(previewEtaText, isOverlayContentEnabled(this, KEY_SHOW_ETA));
+        setPreviewVisibility(previewAlertText, isOverlayContentEnabled(this, KEY_SHOW_ALERT));
+        setPreviewVisibility(previewDetailText, isOverlayContentEnabled(this, KEY_SHOW_DETAIL));
+    }
+
+    private void setPreviewVisibility(android.view.View view, boolean visible) {
+        if (view != null) {
+            view.setVisibility(visible ? android.view.View.VISIBLE : android.view.View.GONE);
+        }
+    }
+
     private void notifyOverlayScaleChanged() {
         startOverlayService();
         Intent intent = new Intent(ACTION_OVERLAY_SCALE_CHANGED);
@@ -789,6 +906,12 @@ public class MainActivity extends Activity {
 
     private void notifyClusterMirrorChanged() {
         Intent intent = new Intent(ACTION_CLUSTER_MIRROR_CHANGED);
+        intent.setPackage(getPackageName());
+        sendBroadcast(intent);
+    }
+
+    private void notifyOverlayContentChanged() {
+        Intent intent = new Intent(ACTION_OVERLAY_CONTENT_CHANGED);
         intent.setPackage(getPackageName());
         sendBroadcast(intent);
     }
@@ -860,6 +983,38 @@ public class MainActivity extends Activity {
     static int getClusterY(android.content.Context context, int defaultValue) {
         return Math.max(0, context.getSharedPreferences(PREFS, MODE_PRIVATE)
                 .getInt(KEY_CLUSTER_Y, defaultValue));
+    }
+
+    static boolean isModeVisible(android.content.Context context) {
+        return isOverlayContentEnabled(context, KEY_SHOW_MODE);
+    }
+
+    static boolean isTurnVisible(android.content.Context context) {
+        return isOverlayContentEnabled(context, KEY_SHOW_TURN);
+    }
+
+    static boolean isLaneVisible(android.content.Context context) {
+        return isOverlayContentEnabled(context, KEY_SHOW_LANE);
+    }
+
+    static boolean isLightVisible(android.content.Context context) {
+        return isOverlayContentEnabled(context, KEY_SHOW_LIGHT);
+    }
+
+    static boolean isEtaVisible(android.content.Context context) {
+        return isOverlayContentEnabled(context, KEY_SHOW_ETA);
+    }
+
+    static boolean isAlertVisible(android.content.Context context) {
+        return isOverlayContentEnabled(context, KEY_SHOW_ALERT);
+    }
+
+    static boolean isDetailVisible(android.content.Context context) {
+        return isOverlayContentEnabled(context, KEY_SHOW_DETAIL);
+    }
+
+    static boolean isOverlayContentEnabled(android.content.Context context, String key) {
+        return context.getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(key, true);
     }
 
     private static int clampOverlayScalePercent(int percent) {

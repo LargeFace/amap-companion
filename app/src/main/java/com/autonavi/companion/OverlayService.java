@@ -176,6 +176,7 @@ public class OverlayService extends Service {
         filter.addAction(MainActivity.ACTION_MAIN_OVERLAY_CHANGED);
         filter.addAction(MainActivity.ACTION_OVERLAY_SCALE_CHANGED);
         filter.addAction(MainActivity.ACTION_CLUSTER_MIRROR_CHANGED);
+        filter.addAction(MainActivity.ACTION_OVERLAY_CONTENT_CHANGED);
         try {
             registerReceiver(receiver, filter);
         } catch (Throwable t) {
@@ -328,6 +329,7 @@ public class OverlayService extends Service {
         });
 
         syncMainOverlayAttachment();
+        applyContentVisibilityPrefs();
         updateClusterPosition();
     }
 
@@ -401,6 +403,7 @@ public class OverlayService extends Service {
             clusterPresentation.show();
             updateClusterPosition();
             syncClusterFromMain();
+            applyContentVisibilityPrefs();
             Log.d(TAG, "cluster mirror shown on display " + display.getDisplayId());
         } catch (Throwable t) {
             Log.e(TAG, "cluster mirror show failed", t);
@@ -644,6 +647,7 @@ public class OverlayService extends Service {
         copyTextState(detailText, clusterDetailText);
         copyVisibility(laneSection, clusterLaneSection);
         renderTrafficLights();
+        applyContentVisibilityPrefs();
         updateClusterPosition();
     }
 
@@ -662,12 +666,28 @@ public class OverlayService extends Service {
     }
 
     private void showAnyPanel() {
+        refreshPanelVisibility();
+    }
+
+    private void refreshPanelVisibility() {
         if (panel != null) {
-            panel.setVisibility(View.VISIBLE);
+            panel.setVisibility(hasVisibleChildren(panel) ? View.VISIBLE : View.GONE);
         }
         if (clusterPanel != null) {
-            clusterPanel.setVisibility(View.VISIBLE);
+            clusterPanel.setVisibility(hasVisibleChildren(clusterPanel) ? View.VISIBLE : View.GONE);
         }
+    }
+
+    private boolean hasVisibleChildren(LinearLayout layout) {
+        if (layout == null) {
+            return false;
+        }
+        for (int i = 0; i < layout.getChildCount(); i++) {
+            if (layout.getChildAt(i).getVisibility() == View.VISIBLE) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void updateOverlayPosition() {
@@ -745,6 +765,10 @@ public class OverlayService extends Service {
             stopSelfIfNoVisuals();
             return;
         }
+        if (MainActivity.ACTION_OVERLAY_CONTENT_CHANGED.equals(action)) {
+            applyContentVisibilityPrefs();
+            return;
+        }
         Bundle extras = intent.getExtras();
         Log.d(TAG, "recv action=" + action + " extras=" + describeExtras(extras));
         if (extras == null) {
@@ -788,6 +812,75 @@ public class OverlayService extends Service {
 
         if (ACTION_SEND.equals(action) && intValue(extras, "KEY_TYPE", -1) == 13012) {
             updateLaneFromExtras(extras);
+        }
+    }
+
+    private void applyContentVisibilityPrefs() {
+        syncModeVisibility();
+        syncTurnVisibility();
+        syncLaneVisibility();
+        syncEtaVisibility();
+        syncAlertVisibility();
+        syncDetailVisibility();
+        syncTrafficLightVisibility();
+        refreshPanelVisibility();
+        updateClusterPosition();
+    }
+
+    private void syncModeVisibility() {
+        boolean visible = MainActivity.isModeVisible(this) && modeText != null;
+        setPairedVisibility(modeText, clusterModeText, visible);
+    }
+
+    private void syncTurnVisibility() {
+        boolean visible = MainActivity.isTurnVisible(this)
+                && turnText != null
+                && !TextUtils.isEmpty(turnText.getText());
+        setPairedVisibility(turnText, clusterTurnText, visible);
+    }
+
+    private void syncLaneVisibility() {
+        boolean visible = MainActivity.isLaneVisible(this)
+                && laneBar != null
+                && laneBar.getVisibility() == View.VISIBLE;
+        setPairedVisibility(laneSection, clusterLaneSection, visible);
+    }
+
+    private void syncTrafficLightVisibility() {
+        boolean visible = MainActivity.isLightVisible(this)
+                && lightRow != null
+                && lightRow.getChildCount() > 0;
+        setPairedVisibility(lightRow, clusterLightRow, visible);
+    }
+
+    private void syncEtaVisibility() {
+        boolean visible = MainActivity.isEtaVisible(this)
+                && etaText != null
+                && !TextUtils.isEmpty(etaText.getText());
+        setPairedVisibility(etaText, clusterEtaText, visible);
+    }
+
+    private void syncAlertVisibility() {
+        boolean visible = MainActivity.isAlertVisible(this)
+                && alertText != null
+                && !TextUtils.isEmpty(alertText.getText());
+        setPairedVisibility(alertText, clusterAlertText, visible);
+    }
+
+    private void syncDetailVisibility() {
+        boolean visible = MainActivity.isDetailVisible(this)
+                && detailText != null
+                && !TextUtils.isEmpty(detailText.getText());
+        setPairedVisibility(detailText, clusterDetailText, visible);
+    }
+
+    private void setPairedVisibility(View main, View cluster, boolean visible) {
+        int state = visible ? View.VISIBLE : View.GONE;
+        if (main != null) {
+            main.setVisibility(state);
+        }
+        if (cluster != null) {
+            cluster.setVisibility(state);
         }
     }
 
@@ -908,7 +1001,10 @@ public class OverlayService extends Service {
         if (clusterModeText != null) {
             clusterModeText.setText(text);
         }
-        showAnyPanel();
+        syncModeVisibility();
+        if (MainActivity.isModeVisible(this)) {
+            showAnyPanel();
+        }
     }
 
     private void updateTurnFromExtras(Bundle extras) {
@@ -920,18 +1016,12 @@ public class OverlayService extends Service {
             return;
         }
         if (inCruiseMode) {
-            turnText.setVisibility(View.GONE);
-            if (clusterTurnText != null) {
-                clusterTurnText.setVisibility(View.GONE);
-            }
+            setPairedVisibility(turnText, clusterTurnText, false);
             return;
         }
         int icon = intValue(extras, "NEW_ICON", intValue(extras, "ICON", 0));
         if (icon <= 0) {
-            turnText.setVisibility(View.GONE);
-            if (clusterTurnText != null) {
-                clusterTurnText.setVisibility(View.GONE);
-            }
+            setPairedVisibility(turnText, clusterTurnText, false);
             return;
         }
         navigationTurnDir = turnIconToTrafficDir(icon);
@@ -952,12 +1042,13 @@ public class OverlayService extends Service {
             text.append('\n').append("\u8fdb\u5165 ").append(nextRoad);
         }
         turnText.setText(text.toString());
-        turnText.setVisibility(View.VISIBLE);
         if (clusterTurnText != null) {
             clusterTurnText.setText(text.toString());
-            clusterTurnText.setVisibility(View.VISIBLE);
         }
-        showAnyPanel();
+        syncTurnVisibility();
+        if (MainActivity.isTurnVisible(this)) {
+            showAnyPanel();
+        }
     }
 
     private void updateTrafficLights(Bundle extras) {
@@ -1366,6 +1457,9 @@ public class OverlayService extends Service {
     }
 
     private void renderTrafficLights() {
+        if (lightRow == null) {
+            return;
+        }
         long now = System.currentTimeMillis();
         Iterator<Map.Entry<Integer, LightState>> iterator = trafficLights.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -1408,11 +1502,10 @@ public class OverlayService extends Service {
                 clusterLightRow.addView(lightPill(clusterPresentation.getContext(), state, showDirectionLabel, clusterScale));
             }
         }
-        lightRow.setVisibility(lightRow.getChildCount() > 0 ? View.VISIBLE : View.GONE);
-        if (clusterLightRow != null) {
-            clusterLightRow.setVisibility(clusterLightRow.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+        syncTrafficLightVisibility();
+        if (MainActivity.isLightVisible(this) && lightRow.getChildCount() > 0) {
+            showAnyPanel();
         }
-        showAnyPanel();
     }
 
     private Integer preferredNavigationLightKey(ArrayList<Integer> keys) {
@@ -1677,12 +1770,13 @@ public class OverlayService extends Service {
 
         if (text.length() > 0) {
             etaText.setText(text.toString());
-            etaText.setVisibility(View.VISIBLE);
             if (clusterEtaText != null) {
                 clusterEtaText.setText(text.toString());
-                clusterEtaText.setVisibility(View.VISIBLE);
             }
-            showAnyPanel();
+            syncEtaVisibility();
+            if (MainActivity.isEtaVisible(this)) {
+                showAnyPanel();
+            }
         }
     }
 
@@ -1743,15 +1837,16 @@ public class OverlayService extends Service {
             return;
         }
         alertText.setText(join(parts, "  \u00b7  "));
-        alertText.setVisibility(View.VISIBLE);
         if (clusterAlertText != null) {
             clusterAlertText.setText(alertText.getText());
-            clusterAlertText.setVisibility(View.VISIBLE);
         }
         alertUpdatedAt = System.currentTimeMillis();
         mainHandler.removeCallbacks(alertClear);
         mainHandler.postDelayed(alertClear, ALERT_TTL_MS + 200L);
-        showAnyPanel();
+        syncAlertVisibility();
+        if (MainActivity.isAlertVisible(this)) {
+            showAnyPanel();
+        }
     }
 
     private void clearAlertDetails() {
@@ -1855,12 +1950,13 @@ public class OverlayService extends Service {
             return;
         }
         detailText.setText(join(lines, "\n"));
-        detailText.setVisibility(View.VISIBLE);
         if (clusterDetailText != null) {
             clusterDetailText.setText(detailText.getText());
-            clusterDetailText.setVisibility(View.VISIBLE);
         }
-        showAnyPanel();
+        syncDetailVisibility();
+        if (MainActivity.isDetailVisible(this)) {
+            showAnyPanel();
+        }
     }
 
     private void updateLaneFromExtras(Bundle extras) {
@@ -1898,13 +1994,10 @@ public class OverlayService extends Service {
         if (clusterLaneBar != null) {
             clusterLaneBar.setLaneData(lanes, advised);
         }
-        if (laneSection != null) {
-            laneSection.setVisibility(View.VISIBLE);
+        syncLaneVisibility();
+        if (MainActivity.isLaneVisible(this)) {
+            showAnyPanel();
         }
-        if (clusterLaneSection != null) {
-            clusterLaneSection.setVisibility(View.VISIBLE);
-        }
-        showAnyPanel();
     }
 
     private void hideLaneData() {
