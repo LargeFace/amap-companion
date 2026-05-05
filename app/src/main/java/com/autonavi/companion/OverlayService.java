@@ -60,25 +60,49 @@ public class OverlayService extends Service {
     private WindowManager windowManager;
     private WindowManager.LayoutParams params;
     private LinearLayout panel;
+    private LinearLayout modeRow;
     private TextView modeText;
+    private TextView titleText;
+    private View summaryDivider;
+    private LinearLayout summaryRow;
+    private TextView headingInfoText;
+    private TextView roadInfoText;
+    private LinearLayout turnCard;
+    private TextView turnLeadText;
     private TextView turnText;
+    private TextView turnDistanceText;
     private LinearLayout laneSection;
     private TextView laneTitleText;
     private LaneBarView laneBar;
     private LinearLayout lightRow;
     private TextView etaText;
+    private LinearLayout alertCard;
+    private TextView limitBadgeText;
+    private TextView alertCaptionText;
     private TextView alertText;
     private TextView detailText;
     private Presentation clusterPresentation;
     private FrameLayout clusterStage;
     private LinearLayout clusterPanel;
+    private LinearLayout clusterModeRow;
     private TextView clusterModeText;
+    private TextView clusterTitleText;
+    private View clusterSummaryDivider;
+    private LinearLayout clusterSummaryRow;
+    private TextView clusterHeadingInfoText;
+    private TextView clusterRoadInfoText;
+    private LinearLayout clusterTurnCard;
+    private TextView clusterTurnLeadText;
     private TextView clusterTurnText;
+    private TextView clusterTurnDistanceText;
     private LinearLayout clusterLaneSection;
     private TextView clusterLaneTitleText;
     private LaneBarView clusterLaneBar;
     private LinearLayout clusterLightRow;
     private TextView clusterEtaText;
+    private LinearLayout clusterAlertCard;
+    private TextView clusterLimitBadgeText;
+    private TextView clusterAlertCaptionText;
     private TextView clusterAlertText;
     private TextView clusterDetailText;
     private Display clusterDisplay;
@@ -92,6 +116,14 @@ public class OverlayService extends Service {
     private int downY;
     private boolean dragging;
     private String lastDetailedMode;
+    private String currentModeLabel = "";
+    private String currentRoadName = "";
+    private String currentHeadingSummary = "";
+    private String currentRoadTypeSummary = "";
+    private String currentTurnLead = "";
+    private String currentTurnRoad = "";
+    private String currentTurnDistance = "";
+    private int currentLimitSpeed = -1;
     private long alertUpdatedAt;
     private int navigationTurnDir = -1;
     private float overlayScale = 2f;
@@ -200,94 +232,9 @@ public class OverlayService extends Service {
 
         overlayScale = MainActivity.getOverlayScale(this);
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setGravity(Gravity.CENTER_HORIZONTAL);
-        panel.setPadding(dp(12), dp(10), dp(12), dp(10));
-        applyPanelStyle();
-
-        modeText = new TextView(this);
-        modeText.setTextSize(sp(13f));
-        modeText.setSingleLine(true);
-        modeText.setGravity(Gravity.CENTER);
-        modeText.setText("\u5f85\u63a5\u6536\u5bfc\u822a/\u5de1\u822a\u4fe1\u606f");
-        panel.addView(modeText, new LinearLayout.LayoutParams(-2, -2));
-
-        turnText = new TextView(this);
-        turnText.setTextColor(Color.WHITE);
-        turnText.setTextSize(sp(28f));
-        turnText.setTypeface(Typeface.DEFAULT_BOLD);
-        turnText.setSingleLine(false);
-        turnText.setMaxLines(2);
-        turnText.setEllipsize(TextUtils.TruncateAt.END);
-        turnText.setGravity(Gravity.CENTER);
-        turnText.setPadding(dp(18), dp(6), dp(18), dp(7));
-        GradientDrawable turnBg = new GradientDrawable();
-        turnBg.setOrientation(GradientDrawable.Orientation.LEFT_RIGHT);
-        turnBg.setColors(new int[]{0xFF1D4ED8, 0xFF0891B2});
-        turnBg.setCornerRadius(dp(10));
-        turnText.setBackground(turnBg);
-        turnText.setVisibility(View.GONE);
-        turnText.setMinHeight(dp(62));
-        LinearLayout.LayoutParams turnLp = new LinearLayout.LayoutParams(-2, -2);
-        turnLp.setMargins(0, dp(6), 0, dp(5));
-        panel.addView(turnText, turnLp);
-
-        laneSection = new LinearLayout(this);
-        laneSection.setOrientation(LinearLayout.VERTICAL);
-        laneSection.setGravity(Gravity.CENTER_HORIZONTAL);
-        laneSection.setPadding(dp(8), dp(5), dp(8), dp(7));
-        GradientDrawable laneBg = new GradientDrawable();
-        laneBg.setColor(0xCC0F172A);
-        laneBg.setCornerRadius(dp(10));
-        laneBg.setStroke(dp(1), 0x1FFFFFFF);
-        laneSection.setBackground(laneBg);
-        laneSection.setVisibility(View.GONE);
-        laneTitleText = new TextView(this);
-        laneTitleText.setText("\u8f66\u9053\u4fe1\u606f");
-        laneTitleText.setTextColor(0xFFBAE6FD);
-        laneTitleText.setTextSize(sp(11f));
-        laneTitleText.setTypeface(Typeface.DEFAULT_BOLD);
-        laneTitleText.setGravity(Gravity.CENTER);
-        laneSection.addView(laneTitleText, new LinearLayout.LayoutParams(-2, -2));
-        laneBar = new LaneBarView(this);
-        laneBar.setFrameScaleMultiplier(overlayScale);
-        laneBar.setScaleMultiplier(1.5f);
-        LinearLayout.LayoutParams laneLp = new LinearLayout.LayoutParams(-2, -2);
-        laneLp.setMargins(0, dp(2), 0, 0);
-        laneSection.addView(laneBar, laneLp);
-        LinearLayout.LayoutParams laneSectionLp = new LinearLayout.LayoutParams(-2, -2);
-        laneSectionLp.setMargins(0, dp(5), 0, dp(4));
-        panel.addView(laneSection, laneSectionLp);
-
-        lightRow = new LinearLayout(this);
-        lightRow.setOrientation(LinearLayout.HORIZONTAL);
-        lightRow.setGravity(Gravity.CENTER);
-        lightRow.setVisibility(View.GONE);
-        panel.addView(lightRow, new LinearLayout.LayoutParams(-2, -2));
-
-        etaText = new TextView(this);
-        etaText.setTextSize(sp(15f));
-        etaText.setSingleLine(false);
-        etaText.setMaxLines(4);
-        etaText.setGravity(Gravity.CENTER);
-        etaText.setVisibility(View.GONE);
-        panel.addView(etaText, new LinearLayout.LayoutParams(-2, -2));
-
-        alertText = compactText(14f, false);
-        alertText.setVisibility(View.GONE);
-        LinearLayout.LayoutParams alertLp = new LinearLayout.LayoutParams(-2, -2);
-        alertLp.setMargins(0, dp(5), 0, 0);
-        panel.addView(alertText, alertLp);
-
-        detailText = compactText(12f, true);
-        detailText.setMaxLines(4);
-        detailText.setVisibility(View.GONE);
-        LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-2, -2);
-        detailLp.setMargins(0, dp(3), 0, 0);
-        panel.addView(detailText, detailLp);
-
-        applyTextPalette();
+        panel = MainActivity.isNewOverlayUiEnabled(this)
+                ? buildDashboardPanel(this, overlayScale, false)
+                : buildClassicPanel(this, overlayScale, false);
 
         int type = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -488,95 +435,503 @@ public class OverlayService extends Service {
         return null;
     }
 
-    private LinearLayout buildClusterPanel(Context context) {
-        LinearLayout mirror = new LinearLayout(context);
-        mirror.setOrientation(LinearLayout.VERTICAL);
-        mirror.setGravity(Gravity.CENTER_HORIZONTAL);
-        mirror.setPadding(clusterDp(12), clusterDp(10), clusterDp(12), clusterDp(10));
-        mirror.setBackground(createClusterPanelBackground());
+    private LinearLayout buildClassicPanel(Context context, float scale, boolean cluster) {
+        LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setPadding(scaledDp(12, scale), scaledDp(10, scale), scaledDp(12, scale), scaledDp(10, scale));
+        root.setBackground(cluster ? createClusterPanelBackground() : createMainPanelBackground());
 
-        clusterModeText = new TextView(context);
-        clusterModeText.setTextSize(clusterSp(13f));
-        clusterModeText.setSingleLine(true);
-        clusterModeText.setGravity(Gravity.CENTER);
-        clusterModeText.setText("\u5f85\u63a5\u6536\u5bfc\u822a/\u5de1\u822a\u4fe1\u606f");
-        mirror.addView(clusterModeText, new LinearLayout.LayoutParams(-2, -2));
+        TextView mode = new TextView(context);
+        mode.setTextSize(scaledSp(13f, scale));
+        mode.setSingleLine(true);
+        mode.setGravity(Gravity.CENTER);
+        mode.setText("待接收导航/巡航信息");
+        root.addView(mode, new LinearLayout.LayoutParams(-2, -2));
 
-        clusterTurnText = new TextView(context);
-        clusterTurnText.setTextColor(Color.WHITE);
-        clusterTurnText.setTextSize(clusterSp(28f));
-        clusterTurnText.setTypeface(Typeface.DEFAULT_BOLD);
-        clusterTurnText.setSingleLine(false);
-        clusterTurnText.setMaxLines(2);
-        clusterTurnText.setEllipsize(TextUtils.TruncateAt.END);
-        clusterTurnText.setGravity(Gravity.CENTER);
-        clusterTurnText.setPadding(clusterDp(18), clusterDp(6), clusterDp(18), clusterDp(7));
+        TextView turn = new TextView(context);
+        turn.setTextColor(Color.WHITE);
+        turn.setTextSize(scaledSp(28f, scale));
+        turn.setTypeface(Typeface.DEFAULT_BOLD);
+        turn.setSingleLine(false);
+        turn.setMaxLines(2);
+        turn.setEllipsize(TextUtils.TruncateAt.END);
+        turn.setGravity(Gravity.CENTER);
+        turn.setPadding(scaledDp(18, scale), scaledDp(6, scale), scaledDp(18, scale), scaledDp(7, scale));
         GradientDrawable turnBg = new GradientDrawable();
         turnBg.setOrientation(GradientDrawable.Orientation.LEFT_RIGHT);
         turnBg.setColors(new int[]{0xFF1D4ED8, 0xFF0891B2});
-        turnBg.setCornerRadius(clusterDp(10));
-        clusterTurnText.setBackground(turnBg);
-        clusterTurnText.setVisibility(View.GONE);
-        clusterTurnText.setMinHeight(clusterDp(62));
+        turnBg.setCornerRadius(scaledDp(10, scale));
+        turn.setBackground(turnBg);
+        turn.setVisibility(View.GONE);
+        turn.setMinHeight(scaledDp(62, scale));
         LinearLayout.LayoutParams turnLp = new LinearLayout.LayoutParams(-2, -2);
-        turnLp.setMargins(0, clusterDp(6), 0, clusterDp(5));
-        mirror.addView(clusterTurnText, turnLp);
+        turnLp.setMargins(0, scaledDp(6, scale), 0, scaledDp(5, scale));
+        root.addView(turn, turnLp);
 
-        clusterLaneSection = new LinearLayout(context);
-        clusterLaneSection.setOrientation(LinearLayout.VERTICAL);
-        clusterLaneSection.setGravity(Gravity.CENTER_HORIZONTAL);
-        clusterLaneSection.setPadding(clusterDp(8), clusterDp(5), clusterDp(8), clusterDp(7));
+        LinearLayout laneBox = new LinearLayout(context);
+        laneBox.setOrientation(LinearLayout.VERTICAL);
+        laneBox.setGravity(Gravity.CENTER_HORIZONTAL);
+        laneBox.setPadding(scaledDp(8, scale), scaledDp(5, scale), scaledDp(8, scale), scaledDp(7, scale));
         GradientDrawable laneBg = new GradientDrawable();
         laneBg.setColor(0xCC0F172A);
-        laneBg.setCornerRadius(clusterDp(10));
-        laneBg.setStroke(clusterDp(1), 0x1FFFFFFF);
-        clusterLaneSection.setBackground(laneBg);
-        clusterLaneSection.setVisibility(View.GONE);
-        clusterLaneTitleText = new TextView(context);
-        clusterLaneTitleText.setText("\u8f66\u9053\u4fe1\u606f");
-        clusterLaneTitleText.setTextColor(0xFFBAE6FD);
-        clusterLaneTitleText.setTextSize(clusterSp(11f));
-        clusterLaneTitleText.setTypeface(Typeface.DEFAULT_BOLD);
-        clusterLaneTitleText.setGravity(Gravity.CENTER);
-        clusterLaneSection.addView(clusterLaneTitleText, new LinearLayout.LayoutParams(-2, -2));
-        clusterLaneBar = new LaneBarView(context);
-        clusterLaneBar.setFrameScaleMultiplier(clusterScale);
-        clusterLaneBar.setScaleMultiplier(1.5f);
+        laneBg.setCornerRadius(scaledDp(10, scale));
+        laneBg.setStroke(scaledDp(1, scale), 0x1FFFFFFF);
+        laneBox.setBackground(laneBg);
+        laneBox.setVisibility(View.GONE);
+
+        TextView laneTitle = new TextView(context);
+        laneTitle.setText("车道信息");
+        laneTitle.setTextColor(0xFFBAE6FD);
+        laneTitle.setTextSize(scaledSp(11f, scale));
+        laneTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        laneTitle.setGravity(Gravity.CENTER);
+        laneBox.addView(laneTitle, new LinearLayout.LayoutParams(-2, -2));
+
+        LaneBarView lane = new LaneBarView(context);
+        lane.setFrameScaleMultiplier(scale);
+        lane.setScaleMultiplier(1.5f);
         LinearLayout.LayoutParams laneLp = new LinearLayout.LayoutParams(-2, -2);
-        laneLp.setMargins(0, clusterDp(2), 0, 0);
-        clusterLaneSection.addView(clusterLaneBar, laneLp);
+        laneLp.setMargins(0, scaledDp(2, scale), 0, 0);
+        laneBox.addView(lane, laneLp);
         LinearLayout.LayoutParams laneSectionLp = new LinearLayout.LayoutParams(-2, -2);
-        laneSectionLp.setMargins(0, clusterDp(5), 0, clusterDp(4));
-        mirror.addView(clusterLaneSection, laneSectionLp);
+        laneSectionLp.setMargins(0, scaledDp(5, scale), 0, scaledDp(4, scale));
+        root.addView(laneBox, laneSectionLp);
 
-        clusterLightRow = new LinearLayout(context);
-        clusterLightRow.setOrientation(LinearLayout.HORIZONTAL);
-        clusterLightRow.setGravity(Gravity.CENTER);
-        clusterLightRow.setVisibility(View.GONE);
-        mirror.addView(clusterLightRow, new LinearLayout.LayoutParams(-2, -2));
+        LinearLayout lights = new LinearLayout(context);
+        lights.setOrientation(LinearLayout.HORIZONTAL);
+        lights.setGravity(Gravity.CENTER);
+        lights.setVisibility(View.GONE);
+        root.addView(lights, new LinearLayout.LayoutParams(-2, -2));
 
-        clusterEtaText = new TextView(context);
-        clusterEtaText.setTextSize(clusterSp(15f));
-        clusterEtaText.setSingleLine(false);
-        clusterEtaText.setMaxLines(4);
-        clusterEtaText.setGravity(Gravity.CENTER);
-        clusterEtaText.setVisibility(View.GONE);
-        mirror.addView(clusterEtaText, new LinearLayout.LayoutParams(-2, -2));
+        TextView eta = new TextView(context);
+        eta.setTextSize(scaledSp(15f, scale));
+        eta.setSingleLine(false);
+        eta.setMaxLines(4);
+        eta.setGravity(Gravity.CENTER);
+        eta.setVisibility(View.GONE);
+        root.addView(eta, new LinearLayout.LayoutParams(-2, -2));
 
-        clusterAlertText = compactText(context, 14f, false, clusterScale);
-        clusterAlertText.setVisibility(View.GONE);
+        TextView alert = compactText(context, 14f, false, scale);
+        alert.setVisibility(View.GONE);
         LinearLayout.LayoutParams alertLp = new LinearLayout.LayoutParams(-2, -2);
-        alertLp.setMargins(0, clusterDp(5), 0, 0);
-        mirror.addView(clusterAlertText, alertLp);
+        alertLp.setMargins(0, scaledDp(5, scale), 0, 0);
+        root.addView(alert, alertLp);
 
-        clusterDetailText = compactText(context, 12f, true, clusterScale);
-        clusterDetailText.setMaxLines(4);
-        clusterDetailText.setVisibility(View.GONE);
+        TextView detail = compactText(context, 12f, true, scale);
+        detail.setMaxLines(4);
+        detail.setVisibility(View.GONE);
         LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-2, -2);
-        detailLp.setMargins(0, clusterDp(3), 0, 0);
-        mirror.addView(clusterDetailText, detailLp);
+        detailLp.setMargins(0, scaledDp(3, scale), 0, 0);
+        root.addView(detail, detailLp);
+
+        if (cluster) {
+            clusterPanel = root;
+            clusterModeRow = null;
+            clusterModeText = mode;
+            clusterTitleText = null;
+            clusterSummaryDivider = null;
+            clusterSummaryRow = null;
+            clusterHeadingInfoText = null;
+            clusterRoadInfoText = null;
+            clusterTurnCard = null;
+            clusterTurnLeadText = null;
+            clusterTurnText = turn;
+            clusterTurnDistanceText = null;
+            clusterLaneSection = laneBox;
+            clusterLaneTitleText = laneTitle;
+            clusterLaneBar = lane;
+            clusterLightRow = lights;
+            clusterEtaText = eta;
+            clusterAlertCard = null;
+            clusterLimitBadgeText = null;
+            clusterAlertCaptionText = null;
+            clusterAlertText = alert;
+            clusterDetailText = detail;
+        } else {
+            panel = root;
+            modeRow = null;
+            modeText = mode;
+            titleText = null;
+            summaryDivider = null;
+            summaryRow = null;
+            headingInfoText = null;
+            roadInfoText = null;
+            turnCard = null;
+            turnLeadText = null;
+            turnText = turn;
+            turnDistanceText = null;
+            laneSection = laneBox;
+            laneTitleText = laneTitle;
+            laneBar = lane;
+            lightRow = lights;
+            etaText = eta;
+            alertCard = null;
+            limitBadgeText = null;
+            alertCaptionText = null;
+            alertText = alert;
+            detailText = detail;
+        }
+
         applyTextPalette();
-        return mirror;
+        return root;
+    }
+
+    private LinearLayout buildDashboardPanel(Context context, float scale, boolean cluster) {
+        LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setPadding(scaledDp(cluster ? 12 : 14, scale), scaledDp(cluster ? 8 : 10, scale),
+                scaledDp(cluster ? 12 : 14, scale), scaledDp(cluster ? 8 : 10, scale));
+        root.setMinimumWidth(scaledDp(cluster ? 300 : 314, scale));
+        root.setBackground(cluster ? createClusterPanelBackground() : createMainPanelBackground());
+
+        LinearLayout header = new LinearLayout(context);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        root.addView(header, new LinearLayout.LayoutParams(-2, -2));
+
+        TextView badge = circleBadge(context, "↗", scale, 0xFF3B82F6, 0xCC0A1422);
+        header.addView(badge, new LinearLayout.LayoutParams(scaledDp(32, scale), scaledDp(32, scale)));
+
+        TextView mode = new TextView(context);
+        mode.setText("待接收导航/巡航信息");
+        mode.setTextSize(scaledSp(13f, scale));
+        mode.setSingleLine(true);
+        mode.setEllipsize(TextUtils.TruncateAt.END);
+        mode.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams modeLp = new LinearLayout.LayoutParams(-2, -2);
+        modeLp.setMargins(scaledDp(12, scale), 0, 0, 0);
+        header.addView(mode, modeLp);
+
+        TextView title = new TextView(context);
+        title.setText("待命");
+        title.setTextSize(scaledSp(cluster ? 24f : 26f, scale));
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setGravity(Gravity.CENTER);
+        title.setMaxLines(2);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-2, -2);
+        titleLp.setMargins(0, scaledDp(cluster ? 10 : 12, scale), 0, scaledDp(cluster ? 6 : 8, scale));
+        root.addView(title, titleLp);
+
+        LinearLayout clusterColumns = null;
+        LinearLayout clusterLeftColumn = null;
+        LinearLayout clusterRightColumn = null;
+        if (cluster) {
+            clusterColumns = new LinearLayout(context);
+            clusterColumns.setOrientation(LinearLayout.HORIZONTAL);
+            clusterColumns.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            root.addView(clusterColumns, sectionLp(scale, 6f));
+
+            clusterLeftColumn = new LinearLayout(context);
+            clusterLeftColumn.setOrientation(LinearLayout.VERTICAL);
+            clusterLeftColumn.setGravity(Gravity.CENTER_HORIZONTAL);
+            clusterColumns.addView(clusterLeftColumn, new LinearLayout.LayoutParams(-2, -2));
+
+            View columnGap = new View(context);
+            LinearLayout.LayoutParams gapLp = new LinearLayout.LayoutParams(scaledDp(8, scale), 1);
+            clusterColumns.addView(columnGap, gapLp);
+
+            clusterRightColumn = new LinearLayout(context);
+            clusterRightColumn.setOrientation(LinearLayout.VERTICAL);
+            clusterRightColumn.setGravity(Gravity.CENTER_HORIZONTAL);
+            clusterColumns.addView(clusterRightColumn, new LinearLayout.LayoutParams(-2, -2));
+        }
+
+        View divider = new View(context);
+        divider.setBackgroundColor(withAlpha(0xFFFFFFFF, 12));
+        divider.setVisibility(View.GONE);
+        root.addView(divider, new LinearLayout.LayoutParams(scaledDp(220, scale), scaledDp(1, scale)));
+
+        LinearLayout summary = new LinearLayout(context);
+        summary.setOrientation(LinearLayout.HORIZONTAL);
+        summary.setGravity(Gravity.CENTER_VERTICAL);
+        summary.setBackground(createSectionBackground(scale));
+        summary.setPadding(scaledDp(14, scale), scaledDp(12, scale), scaledDp(14, scale), scaledDp(12, scale));
+        summary.setVisibility(View.GONE);
+        if (cluster && clusterLeftColumn != null) {
+            clusterLeftColumn.addView(summary, columnSectionLp(scale, 0f));
+        } else {
+            root.addView(summary, sectionLp(scale, 9f));
+        }
+
+        TextView heading = infoBlockText(context, "车头\n--", scale);
+        summary.addView(heading, new LinearLayout.LayoutParams(-2, -2));
+
+        View summaryMid = new View(context);
+        summaryMid.setBackgroundColor(withAlpha(0xFFFFFFFF, 10));
+        LinearLayout.LayoutParams summaryMidLp = new LinearLayout.LayoutParams(scaledDp(1, scale), scaledDp(42, scale));
+        summaryMidLp.setMargins(scaledDp(12, scale), 0, scaledDp(12, scale), 0);
+        summary.addView(summaryMid, summaryMidLp);
+
+        TextView roadInfo = infoBlockText(context, "道路\n未透出", scale);
+        summary.addView(roadInfo, new LinearLayout.LayoutParams(-2, -2));
+
+        LinearLayout turnBox = new LinearLayout(context);
+        turnBox.setOrientation(LinearLayout.HORIZONTAL);
+        turnBox.setGravity(Gravity.CENTER_VERTICAL);
+        turnBox.setBackground(createSectionBackground(scale));
+        turnBox.setPadding(scaledDp(cluster ? 14 : 16, scale), scaledDp(cluster ? 10 : 12, scale),
+                scaledDp(cluster ? 14 : 16, scale), scaledDp(cluster ? 10 : 12, scale));
+        turnBox.setVisibility(View.GONE);
+        if (cluster && clusterLeftColumn != null) {
+            clusterLeftColumn.addView(turnBox, columnSectionLp(scale, 0f));
+        } else {
+            root.addView(turnBox, sectionLp(scale, 9f));
+        }
+
+        LinearLayout turnLeft = new LinearLayout(context);
+        turnLeft.setOrientation(LinearLayout.VERTICAL);
+        turnBox.addView(turnLeft, new LinearLayout.LayoutParams(-2, -2));
+
+        TextView turnLead = new TextView(context);
+        turnLead.setText("↑ 下一路口");
+        turnLead.setTextSize(scaledSp(12f, scale));
+        turnLead.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams turnLeadLp = new LinearLayout.LayoutParams(-2, -2);
+        turnLeadLp.setMargins(0, 0, 0, scaledDp(1, scale));
+        turnLeft.addView(turnLead, turnLeadLp);
+
+        TextView turnRoad = new TextView(context);
+        turnRoad.setTextSize(scaledSp(cluster ? 22f : 24f, scale));
+        turnRoad.setTypeface(Typeface.DEFAULT_BOLD);
+        turnRoad.setMaxLines(2);
+        LinearLayout.LayoutParams turnRoadLp = new LinearLayout.LayoutParams(-2, -2);
+        turnRoadLp.setMargins(0, scaledDp(6, scale), 0, 0);
+        turnLeft.addView(turnRoad, turnRoadLp);
+
+        TextView turnDistance = new TextView(context);
+        turnDistance.setTextSize(scaledSp(cluster ? 22f : 24f, scale));
+        turnDistance.setTypeface(Typeface.DEFAULT_BOLD);
+        turnDistance.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams turnDistanceLp = new LinearLayout.LayoutParams(-2, -2);
+        turnDistanceLp.setMargins(scaledDp(18, scale), 0, 0, 0);
+        turnBox.addView(turnDistance, turnDistanceLp);
+
+        LinearLayout laneBox = new LinearLayout(context);
+        laneBox.setOrientation(LinearLayout.VERTICAL);
+        laneBox.setGravity(Gravity.CENTER_HORIZONTAL);
+        laneBox.setPadding(scaledDp(10, scale), scaledDp(7, scale), scaledDp(10, scale), scaledDp(8, scale));
+        laneBox.setBackground(createSectionBackground(scale));
+        laneBox.setVisibility(View.GONE);
+        if (cluster && clusterLeftColumn != null) {
+            clusterLeftColumn.addView(laneBox, columnSectionLp(scale, 6f));
+        } else {
+            root.addView(laneBox, sectionLp(scale, 8f));
+        }
+
+        TextView laneTitle = new TextView(context);
+        laneTitle.setText("车道信息");
+        laneTitle.setTextSize(scaledSp(11f, scale));
+        laneTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        laneTitle.setTextColor(0xFF93C5FD);
+        laneBox.addView(laneTitle, new LinearLayout.LayoutParams(-2, -2));
+
+        LaneBarView lane = new LaneBarView(context);
+        lane.setFrameScaleMultiplier(scale);
+        lane.setScaleMultiplier(1.5f);
+        LinearLayout.LayoutParams laneLp = new LinearLayout.LayoutParams(-2, -2);
+        laneLp.setMargins(0, scaledDp(4, scale), 0, 0);
+        laneBox.addView(lane, laneLp);
+
+        LinearLayout lights = new LinearLayout(context);
+        lights.setOrientation(LinearLayout.HORIZONTAL);
+        lights.setGravity(Gravity.CENTER);
+        lights.setVisibility(View.GONE);
+        if (cluster && clusterRightColumn != null) {
+            clusterRightColumn.addView(lights, columnSectionLp(scale, 0f));
+        } else {
+            root.addView(lights, sectionLp(scale, 6f));
+        }
+
+        TextView eta = new TextView(context);
+        eta.setTextSize(scaledSp(14f, scale));
+        eta.setSingleLine(false);
+        eta.setMaxLines(4);
+        eta.setGravity(Gravity.CENTER);
+        eta.setPadding(scaledDp(12, scale), scaledDp(8, scale), scaledDp(12, scale), scaledDp(8, scale));
+        eta.setBackground(createSectionBackground(scale));
+        eta.setVisibility(View.GONE);
+        if (cluster && clusterRightColumn != null) {
+            clusterRightColumn.addView(eta, columnSectionLp(scale, 6f));
+        } else {
+            root.addView(eta, sectionLp(scale, 8f));
+        }
+
+        LinearLayout alertBox = new LinearLayout(context);
+        alertBox.setOrientation(LinearLayout.HORIZONTAL);
+        alertBox.setGravity(Gravity.CENTER_VERTICAL);
+        alertBox.setPadding(scaledDp(14, scale), scaledDp(10, scale), scaledDp(14, scale), scaledDp(10, scale));
+        alertBox.setBackground(createSectionBackground(scale));
+        alertBox.setVisibility(View.GONE);
+        if (cluster && clusterRightColumn != null) {
+            clusterRightColumn.addView(alertBox, columnSectionLp(scale, 6f));
+        } else {
+            root.addView(alertBox, sectionLp(scale, 8f));
+        }
+
+        TextView limitBadge = speedBadge(context, "--", scale);
+        alertBox.addView(limitBadge, new LinearLayout.LayoutParams(scaledDp(58, scale), scaledDp(58, scale)));
+
+        LinearLayout alertRight = new LinearLayout(context);
+        alertRight.setOrientation(LinearLayout.VERTICAL);
+        alertRight.setPadding(scaledDp(14, scale), 0, 0, 0);
+        alertBox.addView(alertRight, new LinearLayout.LayoutParams(-2, -2));
+
+        TextView alertCaption = new TextView(context);
+        alertCaption.setText("道路提醒");
+        alertCaption.setTextSize(scaledSp(12f, scale));
+        alertCaption.setTypeface(Typeface.DEFAULT_BOLD);
+        alertCaption.setTextColor(0xFFCBD5E1);
+        alertRight.addView(alertCaption, new LinearLayout.LayoutParams(-2, -2));
+
+        TextView alert = compactText(context, 14f, false, scale);
+        alert.setGravity(Gravity.START);
+        alert.setPadding(0, scaledDp(4, scale), 0, 0);
+        alert.setMaxLines(3);
+        alertRight.addView(alert, new LinearLayout.LayoutParams(-2, -2));
+
+        TextView detail = compactText(context, 12f, true, scale);
+        detail.setMaxLines(4);
+        detail.setPadding(scaledDp(12, scale), scaledDp(8, scale), scaledDp(12, scale), scaledDp(8, scale));
+        detail.setBackground(createSectionBackground(scale));
+        detail.setVisibility(View.GONE);
+        if (cluster && clusterLeftColumn != null) {
+            clusterLeftColumn.addView(detail, columnSectionLp(scale, 6f));
+        } else {
+            root.addView(detail, sectionLp(scale, 6f));
+        }
+
+        if (cluster) {
+            clusterPanel = root;
+            clusterModeRow = header;
+            clusterModeText = mode;
+            clusterTitleText = title;
+            clusterSummaryDivider = divider;
+            clusterSummaryRow = summary;
+            clusterHeadingInfoText = heading;
+            clusterRoadInfoText = roadInfo;
+            clusterTurnCard = turnBox;
+            clusterTurnLeadText = turnLead;
+            clusterTurnText = turnRoad;
+            clusterTurnDistanceText = turnDistance;
+            clusterLaneSection = laneBox;
+            clusterLaneTitleText = laneTitle;
+            clusterLaneBar = lane;
+            clusterLightRow = lights;
+            clusterEtaText = eta;
+            clusterAlertCard = alertBox;
+            clusterLimitBadgeText = limitBadge;
+            clusterAlertCaptionText = alertCaption;
+            clusterAlertText = alert;
+            clusterDetailText = detail;
+        } else {
+            panel = root;
+            modeRow = header;
+            modeText = mode;
+            titleText = title;
+            summaryDivider = divider;
+            summaryRow = summary;
+            headingInfoText = heading;
+            roadInfoText = roadInfo;
+            turnCard = turnBox;
+            turnLeadText = turnLead;
+            turnText = turnRoad;
+            turnDistanceText = turnDistance;
+            laneSection = laneBox;
+            laneTitleText = laneTitle;
+            laneBar = lane;
+            lightRow = lights;
+            etaText = eta;
+            alertCard = alertBox;
+            limitBadgeText = limitBadge;
+            alertCaptionText = alertCaption;
+            alertText = alert;
+            detailText = detail;
+        }
+
+        applyTextPalette();
+        refreshRoadTitle();
+        refreshStatusSummary();
+        refreshTurnCard();
+        refreshAlertCard();
+        return root;
+    }
+
+    private boolean shouldShowStandbyStatusDetails() {
+        if (TextUtils.isEmpty(currentModeLabel)) {
+            return false;
+        }
+        return currentModeLabel.startsWith("\u5bfc\u822a")
+                || currentModeLabel.startsWith("\u5de1\u822a")
+                || currentModeLabel.startsWith("\u6a21\u62df\u5bfc\u822a");
+    }
+
+    private LinearLayout.LayoutParams sectionLp(float scale, float topMarginDp) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+        lp.setMargins(0, scaledDp(topMarginDp, scale), 0, 0);
+        return lp;
+    }
+
+    private LinearLayout.LayoutParams columnSectionLp(float scale, float topMarginDp) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+        if (topMarginDp > 0f) {
+            lp.setMargins(0, scaledDp(topMarginDp, scale), 0, 0);
+        }
+        return lp;
+    }
+
+    private TextView infoBlockText(Context context, String text, float scale) {
+        TextView view = new TextView(context);
+        view.setText(text);
+        view.setTextSize(scaledSp(13.5f, scale));
+        view.setTypeface(Typeface.DEFAULT_BOLD);
+        view.setGravity(Gravity.CENTER);
+        return view;
+    }
+
+    private TextView circleBadge(Context context, String text, float scale, int strokeColor, int fillColor) {
+        TextView view = new TextView(context);
+        view.setText(text);
+        view.setGravity(Gravity.CENTER);
+        view.setTypeface(Typeface.DEFAULT_BOLD);
+        view.setTextColor(strokeColor);
+        view.setTextSize(scaledSp(16f, scale));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(fillColor);
+        bg.setStroke(scaledDp(2, scale), strokeColor);
+        view.setBackground(bg);
+        return view;
+    }
+
+    private TextView speedBadge(Context context, String text, float scale) {
+        TextView view = new TextView(context);
+        view.setText(text);
+        view.setGravity(Gravity.CENTER);
+        view.setTypeface(Typeface.DEFAULT_BOLD);
+        view.setTextColor(Color.WHITE);
+        view.setTextSize(scaledSp(20f, scale));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(0x12000000);
+        bg.setStroke(scaledDp(3, scale), 0xFFEF4444);
+        view.setBackground(bg);
+        return view;
+    }
+
+    private GradientDrawable createSectionBackground(float scale) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(withAlpha(0xFF132131, 86));
+        bg.setCornerRadius(scaledDp(14, scale));
+        bg.setStroke(scaledDp(1, scale), withAlpha(0xFFFFFFFF, 10));
+        return bg;
+    }
+
+    private LinearLayout buildClusterPanel(Context context) {
+        return MainActivity.isNewOverlayUiEnabled(this)
+                ? buildDashboardPanel(context, clusterScale, true)
+                : buildClassicPanel(context, clusterScale, true);
     }
 
     private FrameLayout.LayoutParams clusterLayoutParams() {
@@ -635,13 +990,25 @@ public class OverlayService extends Service {
         clusterPresentation = null;
         clusterStage = null;
         clusterPanel = null;
+        clusterModeRow = null;
         clusterModeText = null;
+        clusterTitleText = null;
+        clusterSummaryDivider = null;
+        clusterSummaryRow = null;
+        clusterHeadingInfoText = null;
+        clusterRoadInfoText = null;
+        clusterTurnCard = null;
+        clusterTurnLeadText = null;
         clusterTurnText = null;
+        clusterTurnDistanceText = null;
         clusterLaneSection = null;
         clusterLaneTitleText = null;
         clusterLaneBar = null;
         clusterLightRow = null;
         clusterEtaText = null;
+        clusterAlertCard = null;
+        clusterLimitBadgeText = null;
+        clusterAlertCaptionText = null;
         clusterAlertText = null;
         clusterDetailText = null;
         clusterDisplay = null;
@@ -760,12 +1127,24 @@ public class OverlayService extends Service {
             }
         }
         panel = null;
+        modeRow = null;
         modeText = null;
+        titleText = null;
+        summaryDivider = null;
+        summaryRow = null;
+        headingInfoText = null;
+        roadInfoText = null;
+        turnCard = null;
+        turnLeadText = null;
         turnText = null;
+        turnDistanceText = null;
         laneSection = null;
         laneBar = null;
         lightRow = null;
         etaText = null;
+        alertCard = null;
+        limitBadgeText = null;
+        alertCaptionText = null;
         alertText = null;
         detailText = null;
         ensureOverlay();
@@ -814,7 +1193,10 @@ public class OverlayService extends Service {
             return;
         }
         if (MainActivity.ACTION_OVERLAY_STYLE_CHANGED.equals(action)) {
-            applyPanelStyle();
+            rebuildOverlay();
+            dismissClusterMirror();
+            ensureClusterMirror();
+            applyContentVisibilityPrefs();
             return;
         }
         if (MainActivity.ACTION_OVERLAY_CONTENT_CHANGED.equals(action)) {
@@ -914,11 +1296,35 @@ public class OverlayService extends Service {
         if (modeText != null) {
             modeText.setTextColor(primary);
         }
+        if (titleText != null) {
+            titleText.setTextColor(primary);
+        }
+        if (headingInfoText != null) {
+            headingInfoText.setTextColor(primary);
+        }
+        if (roadInfoText != null) {
+            roadInfoText.setTextColor(primary);
+        }
+        if (turnLeadText != null) {
+            turnLeadText.setTextColor(0xFF60A5FA);
+        }
+        if (turnText != null) {
+            turnText.setTextColor(primary);
+        }
+        if (turnDistanceText != null) {
+            turnDistanceText.setTextColor(primary);
+        }
         if (etaText != null) {
             etaText.setTextColor(primary);
         }
+        if (alertCaptionText != null) {
+            alertCaptionText.setTextColor(0xFFCBD5E1);
+        }
+        if (limitBadgeText != null) {
+            limitBadgeText.setTextColor(Color.WHITE);
+        }
         if (alertText != null) {
-            alertText.setTextColor(alert);
+            alertText.setTextColor(primary);
         }
         if (detailText != null) {
             detailText.setTextColor(detail);
@@ -926,11 +1332,35 @@ public class OverlayService extends Service {
         if (clusterModeText != null) {
             clusterModeText.setTextColor(primary);
         }
+        if (clusterTitleText != null) {
+            clusterTitleText.setTextColor(primary);
+        }
+        if (clusterHeadingInfoText != null) {
+            clusterHeadingInfoText.setTextColor(primary);
+        }
+        if (clusterRoadInfoText != null) {
+            clusterRoadInfoText.setTextColor(primary);
+        }
+        if (clusterTurnLeadText != null) {
+            clusterTurnLeadText.setTextColor(0xFF60A5FA);
+        }
+        if (clusterTurnText != null) {
+            clusterTurnText.setTextColor(primary);
+        }
+        if (clusterTurnDistanceText != null) {
+            clusterTurnDistanceText.setTextColor(primary);
+        }
         if (clusterEtaText != null) {
             clusterEtaText.setTextColor(primary);
         }
+        if (clusterAlertCaptionText != null) {
+            clusterAlertCaptionText.setTextColor(0xFFCBD5E1);
+        }
+        if (clusterLimitBadgeText != null) {
+            clusterLimitBadgeText.setTextColor(Color.WHITE);
+        }
         if (clusterAlertText != null) {
-            clusterAlertText.setTextColor(alert);
+            clusterAlertText.setTextColor(primary);
         }
         if (clusterDetailText != null) {
             clusterDetailText.setTextColor(detail);
@@ -954,16 +1384,84 @@ public class OverlayService extends Service {
         return (alpha << 24) | (color & 0x00FFFFFF);
     }
 
+    private void refreshRoadTitle() {
+        String road = TextUtils.isEmpty(currentRoadName) ? "待命" : currentRoadName;
+        if (titleText != null) {
+            titleText.setText(road);
+        }
+        if (clusterTitleText != null) {
+            clusterTitleText.setText(road);
+        }
+    }
+
+    private void refreshStatusSummary() {
+        String heading = TextUtils.isEmpty(currentHeadingSummary) ? "车头\n--" : "车头\n" + currentHeadingSummary;
+        String roadType = TextUtils.isEmpty(currentRoadTypeSummary) ? "道路\n未透出" : "道路\n" + currentRoadTypeSummary;
+        if (headingInfoText != null) {
+            headingInfoText.setText(heading);
+        }
+        if (clusterHeadingInfoText != null) {
+            clusterHeadingInfoText.setText(heading);
+        }
+        if (roadInfoText != null) {
+            roadInfoText.setText(roadType);
+        }
+        if (clusterRoadInfoText != null) {
+            clusterRoadInfoText.setText(roadType);
+        }
+    }
+
+    private void refreshTurnCard() {
+        String lead = TextUtils.isEmpty(currentTurnLead) ? "↑ 下一路口" : currentTurnLead;
+        if (turnLeadText != null) {
+            turnLeadText.setText(lead);
+        }
+        if (clusterTurnLeadText != null) {
+            clusterTurnLeadText.setText(lead);
+        }
+        if (turnText != null) {
+            turnText.setText(currentTurnRoad);
+        }
+        if (clusterTurnText != null) {
+            clusterTurnText.setText(currentTurnRoad);
+        }
+        if (turnDistanceText != null) {
+            turnDistanceText.setText(currentTurnDistance);
+        }
+        if (clusterTurnDistanceText != null) {
+            clusterTurnDistanceText.setText(currentTurnDistance);
+        }
+    }
+
+    private void refreshAlertCard() {
+        String badge = currentLimitSpeed > 0 ? String.valueOf(currentLimitSpeed) : "--";
+        if (limitBadgeText != null) {
+            limitBadgeText.setText(badge);
+        }
+        if (clusterLimitBadgeText != null) {
+            clusterLimitBadgeText.setText(badge);
+        }
+    }
+
     private void syncModeVisibility() {
         boolean visible = MainActivity.isModeVisible(this) && modeText != null;
-        setPairedVisibility(modeText, clusterModeText, visible);
+        if (modeRow != null || clusterModeRow != null) {
+            setPairedVisibility(modeRow, clusterModeRow, visible);
+            setPairedVisibility(titleText, clusterTitleText, visible);
+        } else {
+            setPairedVisibility(modeText, clusterModeText, visible);
+        }
     }
 
     private void syncTurnVisibility() {
         boolean visible = MainActivity.isTurnVisible(this)
                 && turnText != null
                 && !TextUtils.isEmpty(turnText.getText());
-        setPairedVisibility(turnText, clusterTurnText, visible);
+        if (turnCard != null || clusterTurnCard != null) {
+            setPairedVisibility(turnCard, clusterTurnCard, visible);
+        } else {
+            setPairedVisibility(turnText, clusterTurnText, visible);
+        }
     }
 
     private void syncLaneVisibility() {
@@ -991,7 +1489,11 @@ public class OverlayService extends Service {
         boolean visible = MainActivity.isAlertVisible(this)
                 && alertText != null
                 && !TextUtils.isEmpty(alertText.getText());
-        setPairedVisibility(alertText, clusterAlertText, visible);
+        if (alertCard != null || clusterAlertCard != null) {
+            setPairedVisibility(alertCard, clusterAlertCard, visible);
+        } else {
+            setPairedVisibility(alertText, clusterAlertText, visible);
+        }
     }
 
     private void syncDetailVisibility() {
@@ -1058,6 +1560,12 @@ public class OverlayService extends Service {
             inCruiseMode = false;
             navigationTurnDir = -1;
             lastDetailedMode = null;
+            currentRoadName = "";
+            currentHeadingSummary = "";
+            currentRoadTypeSummary = "";
+            currentTurnLead = "";
+            currentTurnRoad = "";
+            currentTurnDistance = "";
         } else if (keyType == 10019 && state == 8) {
             mode = "\u5bfc\u822a";
             inCruiseMode = false;
@@ -1065,6 +1573,9 @@ public class OverlayService extends Service {
             mode = "\u5bfc\u822a\u5df2\u9000\u51fa";
             inCruiseMode = false;
             navigationTurnDir = -1;
+            currentRoadName = "";
+            currentHeadingSummary = "";
+            currentRoadTypeSummary = "";
             if (etaText != null) {
                 etaText.setVisibility(View.GONE);
             }
@@ -1097,6 +1608,10 @@ public class OverlayService extends Service {
             if (clusterDetailText != null) {
                 clusterDetailText.setVisibility(View.GONE);
             }
+            currentTurnLead = "";
+            currentTurnRoad = "";
+            currentTurnDistance = "";
+            currentLimitSpeed = -1;
         } else if (type == 1) {
             mode = "\u6a21\u62df\u5bfc\u822a";
         } else if (type == 2 || (!hasRoute && (speed >= 0 || !TextUtils.isEmpty(road)))) {
@@ -1107,6 +1622,12 @@ public class OverlayService extends Service {
             inCruiseMode = false;
         } else {
             mode = "\u5df2\u8fde\u63a5";
+            currentRoadName = "";
+            currentHeadingSummary = "";
+            currentRoadTypeSummary = "";
+            currentTurnLead = "";
+            currentTurnRoad = "";
+            currentTurnDistance = "";
         }
 
         StringBuilder sb = new StringBuilder(mode);
@@ -1117,6 +1638,7 @@ public class OverlayService extends Service {
             sb.append(" \u00b7 ").append(speed).append(" km/h");
         }
         String text = sb.toString();
+        currentModeLabel = text;
         if ("\u5df2\u8fde\u63a5".equals(mode) && !TextUtils.isEmpty(lastDetailedMode)) {
             return;
         }
@@ -1124,10 +1646,15 @@ public class OverlayService extends Service {
                 && (!TextUtils.isEmpty(road) || speed >= 0 || "\u5de1\u822a".equals(mode))) {
             lastDetailedMode = text;
         }
+        if (!TextUtils.isEmpty(road)) {
+            currentRoadName = road;
+        }
         modeText.setText(text);
         if (clusterModeText != null) {
             clusterModeText.setText(text);
         }
+        refreshRoadTitle();
+        refreshAlertCard();
         syncModeVisibility();
         if (MainActivity.isModeVisible(this)) {
             showAnyPanel();
@@ -1143,12 +1670,20 @@ public class OverlayService extends Service {
             return;
         }
         if (inCruiseMode) {
-            setPairedVisibility(turnText, clusterTurnText, false);
+            currentTurnLead = "";
+            currentTurnRoad = "";
+            currentTurnDistance = "";
+            refreshTurnCard();
+            setPairedVisibility(turnCard, clusterTurnCard, false);
             return;
         }
         int icon = intValue(extras, "NEW_ICON", intValue(extras, "ICON", 0));
         if (icon <= 0) {
-            setPairedVisibility(turnText, clusterTurnText, false);
+            currentTurnLead = "";
+            currentTurnRoad = "";
+            currentTurnDistance = "";
+            refreshTurnCard();
+            setPairedVisibility(turnCard, clusterTurnCard, false);
             return;
         }
         navigationTurnDir = turnIconToTrafficDir(icon);
@@ -1161,17 +1696,10 @@ public class OverlayService extends Service {
         }
         String symbol = turnSymbol(icon, intValue(extras, "ROUNG_ABOUT_NUM", 0));
         String nextRoad = valueString(extras, "NEXT_ROAD_NAME", "nextRoadName");
-        StringBuilder text = new StringBuilder(symbol);
-        if (!TextUtils.isEmpty(distance)) {
-            text.append("  ").append(distance);
-        }
-        if (!TextUtils.isEmpty(nextRoad)) {
-            text.append('\n').append("\u8fdb\u5165 ").append(nextRoad);
-        }
-        turnText.setText(text.toString());
-        if (clusterTurnText != null) {
-            clusterTurnText.setText(text.toString());
-        }
+        currentTurnLead = symbol + "  下一路口";
+        currentTurnRoad = TextUtils.isEmpty(nextRoad) ? currentRoadName : nextRoad;
+        currentTurnDistance = TextUtils.isEmpty(distance) ? "" : distance;
+        refreshTurnCard();
         syncTurnVisibility();
         if (MainActivity.isTurnVisible(this)) {
             showAnyPanel();
@@ -1900,6 +2428,10 @@ public class OverlayService extends Service {
             if (clusterEtaText != null) {
                 clusterEtaText.setText(text.toString());
             }
+            if (!TextUtils.isEmpty(road) && !roadIsEmptyDestination) {
+                currentRoadName = road;
+            }
+            refreshRoadTitle();
             syncEtaVisibility();
             if (MainActivity.isEtaVisible(this)) {
                 showAnyPanel();
@@ -1959,14 +2491,17 @@ public class OverlayService extends Service {
 
         if (parts.isEmpty()) {
             if (alertPayload) {
+                currentLimitSpeed = -1;
                 clearAlertDetails();
             }
             return;
         }
+        currentLimitSpeed = limitedSpeed;
         alertText.setText(join(parts, "  \u00b7  "));
         if (clusterAlertText != null) {
             clusterAlertText.setText(alertText.getText());
         }
+        refreshAlertCard();
         alertUpdatedAt = System.currentTimeMillis();
         mainHandler.removeCallbacks(alertClear);
         mainHandler.postDelayed(alertClear, ALERT_TTL_MS + 200L);
@@ -1977,6 +2512,7 @@ public class OverlayService extends Service {
     }
 
     private void clearAlertDetails() {
+        currentLimitSpeed = -1;
         if (alertText != null) {
             alertText.setVisibility(View.GONE);
             alertText.setText("");
@@ -1985,6 +2521,8 @@ public class OverlayService extends Service {
             clusterAlertText.setVisibility(View.GONE);
             clusterAlertText.setText("");
         }
+        refreshAlertCard();
+        syncAlertVisibility();
         mainHandler.removeCallbacks(alertClear);
     }
 
@@ -2007,7 +2545,8 @@ public class OverlayService extends Service {
                 doubleValue(extras, "LAT", doubleValue(extras, "LATITUDE", Double.NaN)));
         double lon = doubleValue(extras, "CAR_LONGITUDE",
                 doubleValue(extras, "LON", doubleValue(extras, "LONGITUDE", Double.NaN)));
-        if (direction >= 0 || (!Double.isNaN(lat) && !Double.isNaN(lon) && !(lat == 0.0d && lon == 0.0d))) {
+        boolean showStatusDetails = shouldShowStandbyStatusDetails();
+        if (showStatusDetails && (direction >= 0 || (!Double.isNaN(lat) && !Double.isNaN(lon) && !(lat == 0.0d && lon == 0.0d)))) {
             StringBuilder car = new StringBuilder();
             if (direction >= 0) {
                 car.append("\u8f66\u5934 ").append(direction).append('\u00b0');
@@ -2020,12 +2559,13 @@ public class OverlayService extends Service {
             }
             lines.add(car.toString());
         }
+        currentHeadingSummary = showStatusDetails && direction >= 0 ? (direction + "\u00b0") : "";
 
         String province = valueString(extras, "PROVINCE_NAME", "provinceName");
         String city = valueString(extras, "CITY_NAME", "cityName");
         String district = valueString(extras, "DISTRICT_NAME", "districtName");
         String areaCode = valueString(extras, "AREA_CODE", "areaCode");
-        if (!TextUtils.isEmpty(province) || !TextUtils.isEmpty(city) || !TextUtils.isEmpty(district)) {
+        if (showStatusDetails && (!TextUtils.isEmpty(province) || !TextUtils.isEmpty(city) || !TextUtils.isEmpty(district))) {
             StringBuilder admin = new StringBuilder("\u884c\u653f\u533a ");
             if (!TextUtils.isEmpty(province)) {
                 admin.append(province).append(' ');
@@ -2044,19 +2584,19 @@ public class OverlayService extends Service {
 
         String traffic = valueString(extras, "EXTRA_LOCATION_TRAFFIC_INFO",
                 "EXTRA_TRAFFIC_CONDITION_RESULT_MESSAGE");
-        if (!TextUtils.isEmpty(traffic)) {
+        if (showStatusDetails && !TextUtils.isEmpty(traffic)) {
             lines.add("\u524d\u65b9\u8def\u51b5 " + traffic);
         }
 
-        if (extras.containsKey("EXTRA_MUTE") || extras.containsKey("EXTRA_CASUAL_MUTE")) {
+        if (showStatusDetails && (extras.containsKey("EXTRA_MUTE") || extras.containsKey("EXTRA_CASUAL_MUTE"))) {
             boolean mute = intValue(extras, "EXTRA_MUTE", 0) == 1;
             boolean casual = intValue(extras, "EXTRA_CASUAL_MUTE", 0) == 1;
             lines.add("\u64ad\u62a5 " + (mute ? "\u9759\u97f3" : "\u6709\u58f0")
                     + (casual ? " \u00b7 \u4e34\u65f6\u9759\u97f3" : ""));
         }
 
-        if (extras.containsKey("EXTRA_HOME_OR_COMPANY_WHAT")
-                || extras.containsKey("EXTRA_HOME_OR_COMPANY_ETA")) {
+        if (showStatusDetails && (extras.containsKey("EXTRA_HOME_OR_COMPANY_WHAT")
+                || extras.containsKey("EXTRA_HOME_OR_COMPANY_ETA"))) {
             boolean home = booleanValue(extras, "EXTRA_HOME_OR_COMPANY_WHAT", true);
             String eta = valueString(extras, "EXTRA_HOME_OR_COMPANY_ETA");
             lines.add((home ? "\u56de\u5bb6" : "\u53bb\u516c\u53f8")
@@ -2064,14 +2604,18 @@ public class OverlayService extends Service {
         }
 
         String favorite = valueString(extras, "EXTRA_FAVORITE_MY_LOCATION");
-        if (!TextUtils.isEmpty(favorite)) {
+        if (showStatusDetails && !TextUtils.isEmpty(favorite)) {
             lines.add("\u6536\u85cf\u5f53\u524d\u70b9\u5df2\u8fd4\u56de");
         }
 
         int roadType = intValue(extras, "ROAD_TYPE", -1);
-        if (roadType >= 0) {
-            lines.add("\u9053\u8def " + roadTypeName(roadType));
+        if (showStatusDetails && roadType >= 0) {
+            currentRoadTypeSummary = roadTypeName(roadType);
+            lines.add("\u9053\u8def " + currentRoadTypeSummary);
+        } else {
+            currentRoadTypeSummary = "";
         }
+        refreshStatusSummary();
 
         if (lines.isEmpty()) {
             return;

@@ -59,6 +59,7 @@ public class MainActivity extends Activity {
     static final String KEY_TRANSPARENT_BACKGROUND = "transparent_background";
     static final String KEY_BACKGROUND_OPACITY_PERCENT = "background_opacity_percent";
     static final String KEY_TEXT_MODE = "text_mode";
+    static final String KEY_OVERLAY_UI_STYLE = "overlay_ui_style";
     static final String ACTION_MAIN_OVERLAY_CHANGED = "com.autonavi.companion.MAIN_OVERLAY_CHANGED";
     static final String ACTION_OVERLAY_SCALE_CHANGED = "com.autonavi.companion.OVERLAY_SCALE_CHANGED";
     static final String ACTION_CLUSTER_MIRROR_CHANGED = "com.autonavi.companion.CLUSTER_MIRROR_CHANGED";
@@ -75,6 +76,8 @@ public class MainActivity extends Activity {
     static final String DEFAULT_UPDATE_URL = SERVER_UPDATE_URL;
     static final String TEXT_MODE_LIGHT = "light";
     static final String TEXT_MODE_AUTO = "auto";
+    static final String OVERLAY_UI_OLD = "old";
+    static final String OVERLAY_UI_NEW = "new";
     static final int MIN_BACKGROUND_OPACITY_PERCENT = 15;
     static final int MAX_BACKGROUND_OPACITY_PERCENT = 90;
     static final int DEFAULT_BACKGROUND_OPACITY_PERCENT = 90;
@@ -92,6 +95,7 @@ public class MainActivity extends Activity {
     private FrameLayout overlayPreviewStage;
     private LinearLayout overlayPreviewPanel;
     private Button overlayTextModeButton;
+    private Button overlayUiStyleButton;
     private TextView previewModeText;
     private TextView previewTurnText;
     private LinearLayout previewLightRow;
@@ -433,6 +437,11 @@ public class MainActivity extends Activity {
             grid.addView(contentToggle("\u8be6\u7ec6\u72b6\u6001", KEY_SHOW_DETAIL));
         }
         addBackgroundOpacityControls(box);
+        overlayUiStyleButton = button(overlayUiStyleButtonText(), v -> chooseOverlayUiStyle(), 0xFF334155);
+        LinearLayout.LayoutParams uiStyleLp = new LinearLayout.LayoutParams(-1, dp(42));
+        uiStyleLp.setMargins(0, dp(8), 0, 0);
+        overlayUiStyleButton.setLayoutParams(uiStyleLp);
+        box.addView(overlayUiStyleButton);
         overlayTextModeButton = button(textModeButtonText(), v -> chooseTextMode(), 0xFF475569);
         LinearLayout.LayoutParams buttonLp = new LinearLayout.LayoutParams(-1, dp(42));
         buttonLp.setMargins(0, dp(8), 0, 0);
@@ -1158,6 +1167,9 @@ public class MainActivity extends Activity {
     private void applyOverlayPreviewStyle() {
         applyOverlayPreviewPanelStyle();
         applyOverlayPreviewTextStyle();
+        if (overlayUiStyleButton != null) {
+            overlayUiStyleButton.setText(overlayUiStyleButtonText());
+        }
         if (overlayTextModeButton != null) {
             overlayTextModeButton.setText(textModeButtonText());
         }
@@ -1203,6 +1215,30 @@ public class MainActivity extends Activity {
                 : "\u6587\u5b57\u6a21\u5f0f\uff1a\u6d45\u8272";
     }
 
+    private String overlayUiStyleButtonText() {
+        return isNewOverlayUiEnabled(this)
+                ? "\u60ac\u6d6e\u7a97\u6837\u5f0f\uff1a\u65b0 UI\uff08\u6d4b\u8bd5\u4e2d\uff09"
+                : "\u60ac\u6d6e\u7a97\u6837\u5f0f\uff1a\u65e7 UI";
+    }
+
+    private void chooseOverlayUiStyle() {
+        String[] labels = {
+                "\u65e7 UI\uff08\u9ed8\u8ba4\uff09",
+                "\u65b0 UI\uff08\u5361\u7247\u6837\u5f0f\uff0c\u6d4b\u8bd5\u4e2d\uff09"
+        };
+        int checked = isNewOverlayUiEnabled(this) ? 1 : 0;
+        new AlertDialog.Builder(this)
+                .setTitle("\u9009\u62e9\u60ac\u6d6e\u7a97\u6837\u5f0f")
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    saveOverlayUiStyle(which == 1 ? OVERLAY_UI_NEW : OVERLAY_UI_OLD);
+                    applyOverlayPreviewStyle();
+                    notifyOverlayStyleChanged();
+                    dialog.dismiss();
+                })
+                .setNegativeButton("\u53d6\u6d88", null)
+                .show();
+    }
+
     private void chooseTextMode() {
         String[] labels = {
                 "\u81ea\u52a8\u6a21\u5f0f\uff08\u6839\u636e\u80cc\u666f\u900f\u660e\u5ea6\u81ea\u52a8\u66f4\u6539\u6587\u5b57\u989c\u8272\uff09",
@@ -1225,6 +1261,13 @@ public class MainActivity extends Activity {
         getSharedPreferences(PREFS, MODE_PRIVATE)
                 .edit()
                 .putString(KEY_TEXT_MODE, TEXT_MODE_AUTO.equals(mode) ? TEXT_MODE_AUTO : TEXT_MODE_LIGHT)
+                .apply();
+    }
+
+    private void saveOverlayUiStyle(String style) {
+        getSharedPreferences(PREFS, MODE_PRIVATE)
+                .edit()
+                .putString(KEY_OVERLAY_UI_STYLE, OVERLAY_UI_NEW.equals(style) ? OVERLAY_UI_NEW : OVERLAY_UI_OLD)
                 .apply();
     }
 
@@ -1470,6 +1513,10 @@ public class MainActivity extends Activity {
         return TEXT_MODE_AUTO.equals(getOverlayTextMode(context));
     }
 
+    static boolean isNewOverlayUiEnabled(android.content.Context context) {
+        return OVERLAY_UI_NEW.equals(getOverlayUiStyle(context));
+    }
+
     static boolean usesDarkTextPalette(android.content.Context context) {
         return getBackgroundOpacityPercent(context) <= 55 && isAutoTextMode(context);
     }
@@ -1489,6 +1536,12 @@ public class MainActivity extends Activity {
         String mode = context.getSharedPreferences(PREFS, MODE_PRIVATE)
                 .getString(KEY_TEXT_MODE, TEXT_MODE_AUTO);
         return TEXT_MODE_LIGHT.equals(mode) ? TEXT_MODE_LIGHT : TEXT_MODE_AUTO;
+    }
+
+    static String getOverlayUiStyle(android.content.Context context) {
+        String style = context.getSharedPreferences(PREFS, MODE_PRIVATE)
+                .getString(KEY_OVERLAY_UI_STYLE, OVERLAY_UI_OLD);
+        return OVERLAY_UI_NEW.equals(style) ? OVERLAY_UI_NEW : OVERLAY_UI_OLD;
     }
 
     static boolean isOverlayContentEnabled(android.content.Context context, String key) {
