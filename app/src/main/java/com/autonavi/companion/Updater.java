@@ -58,6 +58,20 @@ final class Updater {
         if (!TextUtils.isEmpty(apkUrl)) {
             apkUrl = resolveUrl(updateUrl, apkUrl);
         }
+        String changelogUrl = manifest.optString("changelogUrl", "");
+        if (!TextUtils.isEmpty(changelogUrl)) {
+            changelogUrl = resolveUrl(updateUrl, changelogUrl);
+        }
+        String changelog = changelogText(manifest);
+        if (!TextUtils.isEmpty(changelogUrl)) {
+            try {
+                String remoteChangelog = readText(changelogUrl).trim();
+                if (!TextUtils.isEmpty(remoteChangelog)) {
+                    changelog = remoteChangelog;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
         return new UpdateInfo(
                 updateUrl,
                 packageName,
@@ -69,8 +83,8 @@ final class Updater {
                 manifest.optString("sha256", ""),
                 manifest.optLong("size", -1L),
                 manifest.optBoolean("force", false),
-                changelogText(manifest),
-                manifest.optString("changelogUrl", ""));
+                changelog,
+                changelogUrl);
     }
 
     static void install(Context context, UpdateInfo info, Listener listener) {

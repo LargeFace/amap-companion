@@ -130,11 +130,13 @@ function fallbackManifest(release, apkAsset) {
   };
 }
 
-function writeUpdateFiles(release, releaseManifest) {
+function writeUpdateFiles(release, releaseManifest, apkAsset, changelogAsset) {
   const manifest = {
     ...releaseManifest,
     packageName: releaseManifest.packageName || "com.autonavi.companion",
     apkPath: "apk/amap_companion_signed.apk",
+    githubApkUrl: apkAsset.browser_download_url,
+    githubChangelogUrl: changelogAsset ? changelogAsset.browser_download_url : "",
     sha256: sha256(apkDest),
     size: fs.statSync(apkDest).size,
     releaseTag: release.tag_name,
@@ -156,6 +158,18 @@ function writeUpdateFiles(release, releaseManifest) {
   }
 }
 
+function manifestHasGithubChannel() {
+  if (!fs.existsSync(manifestOut)) {
+    return false;
+  }
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestOut, "utf8"));
+    return Boolean(manifest.githubApkUrl);
+  } catch (error) {
+    return false;
+  }
+}
+
 async function main() {
   if (!githubRepo) {
     throw new Error("GITHUB_REPO is required, for example: owner/repo");
@@ -166,7 +180,7 @@ async function main() {
   log(`check ${releaseUrl}`);
   const release = await requestJson(releaseUrl);
   const state = readState();
-  if (!forceSync && state.releaseId === release.id && fs.existsSync(apkDest) && fs.existsSync(manifestOut)) {
+  if (!forceSync && state.releaseId === release.id && fs.existsSync(apkDest) && manifestHasGithubChannel()) {
     log(`already synced ${release.tag_name}`);
     return;
   }
@@ -186,7 +200,7 @@ async function main() {
   } else if (fs.existsSync(changelogOut)) {
     fs.unlinkSync(changelogOut);
   }
-  writeUpdateFiles(release, releaseManifest);
+  writeUpdateFiles(release, releaseManifest, apkAsset, changelogAsset);
   writeState({
     releaseId: release.id,
     releaseTag: release.tag_name,

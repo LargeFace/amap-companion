@@ -34,10 +34,16 @@ public class MainActivity extends Activity {
     static final String PREFS = "amap_companion";
     static final String KEY_TARGET_PACKAGE = "target_package";
     static final String KEY_UPDATE_URL = "update_url";
+    static final String KEY_UPDATE_CHANNEL = "update_channel";
     static final String KEY_OVERLAY_SCALE_PERCENT = "overlay_scale_percent";
     static final String ACTION_OVERLAY_SCALE_CHANGED = "com.autonavi.companion.OVERLAY_SCALE_CHANGED";
     static final String DEFAULT_TARGET_PACKAGE = "com.autonavi.amapClone";
-    static final String DEFAULT_UPDATE_URL = "https://amap-companion.zuoqirun.top/update.json";
+    static final String UPDATE_CHANNEL_SERVER = "server";
+    static final String UPDATE_CHANNEL_GITHUB = "github";
+    static final String DEFAULT_UPDATE_CHANNEL = UPDATE_CHANNEL_SERVER;
+    static final String SERVER_UPDATE_URL = "https://amap-companion.zuoqirun.top/update.json";
+    static final String GITHUB_UPDATE_URL = "https://amap-companion.zuoqirun.top/update-github.json";
+    static final String DEFAULT_UPDATE_URL = SERVER_UPDATE_URL;
     static final int MIN_OVERLAY_SCALE_PERCENT = 80;
     static final int MAX_OVERLAY_SCALE_PERCENT = 300;
     static final int DEFAULT_OVERLAY_SCALE_PERCENT = 200;
@@ -96,7 +102,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams updateLp = new LinearLayout.LayoutParams(-1, -2);
         updateLp.setMargins(0, dp(8), 0, 0);
         hero.addView(updateText, updateLp);
-        updateUpdateText("\u66f4\u65b0\u670d\u52a1\u5668\n" + displayUpdateUrl());
+        updateUpdateText("\u66f4\u65b0\u6e20\u9053\n" + displayUpdateUrl());
 
         LinearLayout controls = card(Color.WHITE);
         LinearLayout.LayoutParams controlsLp = new LinearLayout.LayoutParams(-1, -2);
@@ -108,6 +114,7 @@ public class MainActivity extends Activity {
         controls.addView(button("\u542f\u52a8\u60ac\u6d6e\u7a97", v -> startOverlayService(), 0xFF0F766E));
         controls.addView(button("\u5173\u95ed\u60ac\u6d6e\u7a97", v -> stopOverlayService(), 0xFFB45309));
         controls.addView(button("\u6253\u5f00\u76ee\u6807\u5e94\u7528", v -> openTargetApp(), 0xFF111827));
+        controls.addView(button("\u9009\u62e9\u4e0b\u8f7d\u6e20\u9053", v -> chooseUpdateChannel(), 0xFF334155));
         controls.addView(button("\u68c0\u67e5\u66f4\u65b0", v -> checkForUpdates(true), 0xFF059669));
         addOverlayScaleControls(controls);
 
@@ -474,6 +481,23 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void chooseUpdateChannel() {
+        String[] labels = {
+                "\u670d\u52a1\u5668\u5206\u53d1\uff08\u63a8\u8350\uff09\n" + SERVER_UPDATE_URL,
+                "GitHub \u76f4\u8fde\n" + GITHUB_UPDATE_URL
+        };
+        int checked = UPDATE_CHANNEL_GITHUB.equals(getUpdateChannel()) ? 1 : 0;
+        new AlertDialog.Builder(this)
+                .setTitle("\u9009\u62e9\u4e0b\u8f7d\u6e20\u9053")
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    saveUpdateChannel(which == 1 ? UPDATE_CHANNEL_GITHUB : UPDATE_CHANNEL_SERVER);
+                    updateUpdateText("\u66f4\u65b0\u6e20\u9053\n" + displayUpdateUrl());
+                    dialog.dismiss();
+                })
+                .setNegativeButton("\u53d6\u6d88", null)
+                .show();
+    }
+
     private void updateTargetText() {
         if (targetText != null) {
             targetText.setText("\u76ee\u6807\u5e94\u7528\n" + getTargetPackage(this));
@@ -546,18 +570,55 @@ public class MainActivity extends Activity {
                 .apply();
     }
 
+    private void saveUpdateChannel(String channel) {
+        String normalized = UPDATE_CHANNEL_GITHUB.equals(channel) ? UPDATE_CHANNEL_GITHUB : UPDATE_CHANNEL_SERVER;
+        getSharedPreferences(PREFS, MODE_PRIVATE)
+                .edit()
+                .putString(KEY_UPDATE_CHANNEL, normalized)
+                .putString(KEY_UPDATE_URL, channelToUpdateUrl(normalized))
+                .apply();
+    }
+
     private void persistDefaultUpdateUrl() {
-        saveUpdateUrl(DEFAULT_UPDATE_URL);
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String channel = prefs.getString(KEY_UPDATE_CHANNEL, DEFAULT_UPDATE_CHANNEL);
+        if (!UPDATE_CHANNEL_GITHUB.equals(channel)) {
+            channel = UPDATE_CHANNEL_SERVER;
+        }
+        prefs.edit()
+                .putString(KEY_UPDATE_CHANNEL, channel)
+                .putString(KEY_UPDATE_URL, channelToUpdateUrl(channel))
+                .apply();
     }
 
     private String getUpdateUrl() {
-        String value = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_UPDATE_URL, DEFAULT_UPDATE_URL);
-        return TextUtils.isEmpty(value) ? DEFAULT_UPDATE_URL : value;
+        return channelToUpdateUrl(getUpdateChannel());
+    }
+
+    private String getUpdateChannel() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String channel = prefs.getString(KEY_UPDATE_CHANNEL, DEFAULT_UPDATE_CHANNEL);
+        if (UPDATE_CHANNEL_GITHUB.equals(channel)) {
+            return UPDATE_CHANNEL_GITHUB;
+        }
+        String legacyUrl = prefs.getString(KEY_UPDATE_URL, DEFAULT_UPDATE_URL);
+        if (GITHUB_UPDATE_URL.equals(legacyUrl)) {
+            return UPDATE_CHANNEL_GITHUB;
+        }
+        return UPDATE_CHANNEL_SERVER;
+    }
+
+    private String channelToUpdateUrl(String channel) {
+        return UPDATE_CHANNEL_GITHUB.equals(channel) ? GITHUB_UPDATE_URL : SERVER_UPDATE_URL;
     }
 
     private String displayUpdateUrl() {
         String url = getUpdateUrl();
-        return TextUtils.isEmpty(url) ? "\u672a\u8bbe\u7f6e" : url;
+        if (TextUtils.isEmpty(url)) {
+            return "\u672a\u8bbe\u7f6e";
+        }
+        String channelName = UPDATE_CHANNEL_GITHUB.equals(getUpdateChannel()) ? "GitHub \u76f4\u8fde" : "\u670d\u52a1\u5668\u5206\u53d1";
+        return channelName + "\n" + url;
     }
 
     private void saveOverlayScalePercent(int percent) {
