@@ -5,6 +5,7 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.Presentation;
 import android.app.Service;
+import android.app.usage.UsageEvents;
 import android.app.usage.UsageStats;
 import android.app.usage.UsageStatsManager;
 import android.content.BroadcastReceiver;
@@ -1133,7 +1134,6 @@ public class OverlayService extends Service {
                 "ROUTE_REMAIN_DIS_AUTO", "ROUTE_REMAIN_TIME_AUTO",
                 "ROUTE_REMAIN_DIS", "ROUTE_REMAIN_TIME",
                 "SEG_REMAIN_DIS", "NEXT_SEG_REMAIN_DIS",
-                "CUR_ROAD_NAME", "NEXT_ROAD_NAME",
                 "trafficLightStatus", "redLightCountDownSeconds", "greenLightLastSecond");
     }
 
@@ -1153,12 +1153,36 @@ public class OverlayService extends Service {
         } catch (Throwable t) {
             Log.d(TAG, "read running task failed", t);
         }
+        if (!MainActivity.hasUsageStatsAccess(this)) {
+            Log.d(TAG, "usage stats access not granted; cannot detect target foreground");
+            return false;
+        }
         try {
             UsageStatsManager usageStatsManager = (UsageStatsManager) getSystemService(USAGE_STATS_SERVICE);
             if (usageStatsManager == null) {
                 return false;
             }
             long now = System.currentTimeMillis();
+            UsageEvents events = usageStatsManager.queryEvents(now - 10000L, now);
+            if (events != null) {
+                UsageEvents.Event event = new UsageEvents.Event();
+                String latestForegroundPackage = null;
+                long latestForegroundAt = 0L;
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event);
+                    int type = event.getEventType();
+                    if ((type == UsageEvents.Event.MOVE_TO_FOREGROUND
+                            || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                            && type == UsageEvents.Event.ACTIVITY_RESUMED))
+                            && event.getTimeStamp() >= latestForegroundAt) {
+                        latestForegroundAt = event.getTimeStamp();
+                        latestForegroundPackage = event.getPackageName();
+                    }
+                }
+                if (!TextUtils.isEmpty(latestForegroundPackage)) {
+                    return targetPackage.equals(latestForegroundPackage);
+                }
+            }
             List<UsageStats> stats = usageStatsManager.queryUsageStats(
                     UsageStatsManager.INTERVAL_DAILY, now - 10000L, now);
             UsageStats latest = null;

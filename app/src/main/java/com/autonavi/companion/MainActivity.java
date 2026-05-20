@@ -2,6 +2,7 @@ package com.autonavi.companion;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.AppOpsManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -15,6 +16,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Process;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.Display;
@@ -492,7 +494,7 @@ public class MainActivity extends Activity {
         box.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         TextView hint = new TextView(this);
-        hint.setText("这些选项只控制本程序窗口，不会主动唤醒或启动目标高德应用。");
+        hint.setText("这些选项只控制本程序窗口，不会主动唤醒或启动目标高德应用。高德前台隐藏需要允许“使用情况访问权限”。");
         hint.setTextSize(12f);
         hint.setTextColor(0xFF64748B);
         LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
@@ -1248,10 +1250,22 @@ public class MainActivity extends Activity {
         checkBox.setPadding(0, dp(2), 0, dp(2));
         checkBox.setOnCheckedChangeListener((CompoundButton buttonView, boolean isChecked) -> {
             saveBehaviorEnabled(key, isChecked);
+            if (KEY_HIDE_MAIN_WHEN_TARGET_FOREGROUND.equals(key) && isChecked && !hasUsageStatsAccess(this)) {
+                Toast.makeText(this, "请为 AMap Companion 开启使用情况访问权限", Toast.LENGTH_LONG).show();
+                openUsageAccessSettings();
+            }
             startOverlayService();
             notifyDisplayPolicyChanged();
         });
         return checkBox;
+    }
+
+    private void openUsageAccessSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
+        } catch (Throwable t) {
+            Toast.makeText(this, "无法打开使用情况访问设置", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void saveOverlayContentEnabled(String key, boolean enabled) {
@@ -1583,6 +1597,23 @@ public class MainActivity extends Activity {
 
     static boolean isHideClusterWhenInactiveEnabled(android.content.Context context) {
         return isBehaviorEnabled(context, KEY_HIDE_CLUSTER_WHEN_INACTIVE);
+    }
+
+    static boolean hasUsageStatsAccess(android.content.Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return true;
+        }
+        try {
+            AppOpsManager appOps = (AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE);
+            if (appOps == null) {
+                return false;
+            }
+            int mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    Process.myUid(), context.getPackageName());
+            return mode == AppOpsManager.MODE_ALLOWED;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     static int getClusterScalePercent(android.content.Context context) {
