@@ -82,6 +82,7 @@ public class MainActivity extends Activity {
     static final String KEY_TEXT_MODE = "text_mode";
     static final String KEY_OVERLAY_UI_STYLE = "overlay_ui_style";
     static final String KEY_AUTO_START_ENABLED = "auto_start_enabled";
+    static final String KEY_SHOW_MAIN_WHEN_TARGET_FOREGROUND = "show_main_when_target_foreground";
     static final String KEY_HIDE_MAIN_WHEN_TARGET_FOREGROUND = "hide_main_when_target_foreground";
     static final String KEY_HIDE_CLUSTER_WHEN_INACTIVE = "hide_cluster_when_inactive";
     static final String ACTION_MAIN_OVERLAY_CHANGED = "com.autonavi.companion.MAIN_OVERLAY_CHANGED";
@@ -110,11 +111,12 @@ public class MainActivity extends Activity {
     static final int MIN_BACKGROUND_OPACITY_PERCENT = 0;
     static final int MAX_BACKGROUND_OPACITY_PERCENT = 90;
     static final int DEFAULT_BACKGROUND_OPACITY_PERCENT = 90;
-    static final int MIN_OVERLAY_SCALE_PERCENT = 80;
+    static final int MIN_OVERLAY_SCALE_PERCENT = 30;
     static final int MAX_OVERLAY_SCALE_PERCENT = 300;
     static final int DEFAULT_OVERLAY_SCALE_PERCENT = 200;
     private static final String TARGET_PACKAGE_PREFIX = "com.autonavi.";
-    private static final int REQUEST_LOG_PERMISSIONS = 7001;
+    private static final int REQUEST_READ_LOGS_PERMISSION = 7001;
+    private static final int REQUEST_STORAGE_PERMISSIONS = 7002;
 
     private TextView targetText;
     private TextView updateText;
@@ -133,7 +135,6 @@ public class MainActivity extends Activity {
     private TextView previewEtaText;
     private TextView previewAlertText;
     private TextView previewDetailText;
-    private TextView previewLaneTitleText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -543,7 +544,7 @@ public class MainActivity extends Activity {
         box.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         TextView hint = new TextView(this);
-        hint.setText("这些选项只控制本程序窗口，不会主动唤醒或启动目标高德应用。高德前台隐藏需要允许“使用情况访问权限”。");
+        hint.setText("这些选项只控制本程序窗口，不会主动唤醒或启动目标高德应用。检测高德前台状态需要允许“使用情况访问权限”。");
         hint.setTextSize(12f);
         hint.setTextColor(0xFF64748B);
         LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
@@ -559,12 +560,16 @@ public class MainActivity extends Activity {
         if (isWideLayout()) {
             addTogglePair(grid,
                     behaviorToggle("开机自动启动", KEY_AUTO_START_ENABLED),
-                    behaviorToggle("高德前台隐藏中控悬浮窗", KEY_HIDE_MAIN_WHEN_TARGET_FOREGROUND));
+                    behaviorToggle("高德打开自动显示悬浮窗", KEY_SHOW_MAIN_WHEN_TARGET_FOREGROUND));
+            addTogglePair(grid,
+                    behaviorToggle("高德前台隐藏中控悬浮窗", KEY_HIDE_MAIN_WHEN_TARGET_FOREGROUND),
+                    null);
             addTogglePair(grid,
                     behaviorToggle("导航/巡航退出隐藏仪表", KEY_HIDE_CLUSTER_WHEN_INACTIVE),
                     null);
         } else {
             grid.addView(behaviorToggle("开机自动启动", KEY_AUTO_START_ENABLED));
+            grid.addView(behaviorToggle("高德打开自动显示悬浮窗", KEY_SHOW_MAIN_WHEN_TARGET_FOREGROUND));
             grid.addView(behaviorToggle("高德前台隐藏中控悬浮窗", KEY_HIDE_MAIN_WHEN_TARGET_FOREGROUND));
             grid.addView(behaviorToggle("导航/巡航退出隐藏仪表", KEY_HIDE_CLUSTER_WHEN_INACTIVE));
         }
@@ -747,13 +752,6 @@ public class MainActivity extends Activity {
         laneBg.setCornerRadius(dp(5));
         laneBg.setStroke(dp(1), 0x1FFFFFFF);
         previewLaneSection.setBackground(laneBg);
-
-        previewLaneTitleText = new TextView(this);
-        previewLaneTitleText.setText("\u8f66\u9053\u4fe1\u606f");
-        previewLaneTitleText.setTextSize(5.5f);
-        previewLaneTitleText.setTextColor(0xFFBAE6FD);
-        previewLaneTitleText.setTypeface(Typeface.DEFAULT_BOLD);
-        previewLaneSection.addView(previewLaneTitleText, new LinearLayout.LayoutParams(-2, -2));
 
         LaneBarView laneBar = new LaneBarView(this);
         laneBar.setFrameScaleMultiplier(1f);
@@ -1152,18 +1150,31 @@ public class MainActivity extends Activity {
         content.addView(logScroll, new LinearLayout.LayoutParams(-1, Math.min(dp(520), getResources().getDisplayMetrics().heightPixels / 2)));
 
         LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setWeightSum(4f);
-        content.addView(actions, new LinearLayout.LayoutParams(-1, -2));
+        actions.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(-1, -2);
+        actionsLp.setMargins(0, dp(6), 0, 0);
+        content.addView(actions, actionsLp);
 
-        Button grant = compactDialogButton("\u6388\u6743");
+        LinearLayout permissionRow = new LinearLayout(this);
+        permissionRow.setOrientation(LinearLayout.HORIZONTAL);
+        permissionRow.setWeightSum(2f);
+        actions.addView(permissionRow, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout operationRow = new LinearLayout(this);
+        operationRow.setOrientation(LinearLayout.HORIZONTAL);
+        operationRow.setWeightSum(3f);
+        actions.addView(operationRow, new LinearLayout.LayoutParams(-1, -2));
+
+        Button grantLogs = compactDialogButton("\u65e5\u5fd7\u6743\u9650");
+        Button grantStorage = compactDialogButton("\u5b58\u50a8\u6743\u9650");
         Button refresh = compactDialogButton("\u5237\u65b0");
         Button save = compactDialogButton("\u4fdd\u5b58");
         Button copy = compactDialogButton("\u590d\u5236");
-        actions.addView(grant, new LinearLayout.LayoutParams(0, dp(42), 1f));
-        actions.addView(refresh, new LinearLayout.LayoutParams(0, dp(42), 1f));
-        actions.addView(save, new LinearLayout.LayoutParams(0, dp(42), 1f));
-        actions.addView(copy, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        permissionRow.addView(grantLogs, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        permissionRow.addView(grantStorage, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        operationRow.addView(refresh, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        operationRow.addView(save, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        operationRow.addView(copy, new LinearLayout.LayoutParams(0, dp(42), 1f));
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("\u65e5\u5fd7\u4e0e\u8c03\u8bd5")
@@ -1171,12 +1182,12 @@ public class MainActivity extends Activity {
                 .setPositiveButton("\u5173\u95ed", null)
                 .create();
 
-        grant.setOnClickListener(v -> requestLogAndStoragePermissions(true));
+        grantLogs.setOnClickListener(v -> requestReadLogsPermission(true));
+        grantStorage.setOnClickListener(v -> requestStoragePermission(true));
         refresh.setOnClickListener(v -> refreshLogcat(logText, logScroll));
         save.setOnClickListener(v -> saveLogText(String.valueOf(logText.getText())));
         copy.setOnClickListener(v -> copyLogText(String.valueOf(logText.getText())));
         dialog.setOnShowListener(d -> {
-            requestLogAndStoragePermissions(false);
             refreshLogcat(logText, logScroll);
         });
         dialog.show();
@@ -1191,12 +1202,26 @@ public class MainActivity extends Activity {
         return b;
     }
 
-    private void requestLogAndStoragePermissions(boolean openSettings) {
+    private void requestReadLogsPermission(boolean showSummary) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(Manifest.permission.READ_LOGS) != PackageManager.PERMISSION_GRANTED) {
+                try {
+                    requestPermissions(new String[]{Manifest.permission.READ_LOGS}, REQUEST_READ_LOGS_PERMISSION);
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        if (showSummary) {
+            String logs = hasPermission(Manifest.permission.READ_LOGS)
+                    ? "READ_LOGS 已授权"
+                    : "READ_LOGS 未授权；普通系统通常需要 shell/系统权限才会放行";
+            Toast.makeText(this, logs, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void requestStoragePermission(boolean openSettings) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             ArrayList<String> permissions = new ArrayList<>();
-            if (checkSelfPermission(Manifest.permission.READ_LOGS) != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.READ_LOGS);
-            }
             if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
                     && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -1207,7 +1232,7 @@ public class MainActivity extends Activity {
             }
             if (!permissions.isEmpty()) {
                 try {
-                    requestPermissions(permissions.toArray(new String[0]), REQUEST_LOG_PERMISSIONS);
+                    requestPermissions(permissions.toArray(new String[0]), REQUEST_STORAGE_PERMISSIONS);
                 } catch (Throwable ignored) {
                 }
             }
@@ -1226,7 +1251,7 @@ public class MainActivity extends Activity {
             }
             Toast.makeText(this, "\u8bf7\u5f00\u542f\u201c\u6240\u6709\u6587\u4ef6\u8bbf\u95ee\u6743\u9650\u201d\uff0c\u7528\u4e8e\u4fdd\u5b58\u5230 /sdcard/amap_log", Toast.LENGTH_LONG).show();
         } else if (openSettings) {
-            Toast.makeText(this, logPermissionSummary(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, storagePermissionSummary(), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -1392,10 +1417,11 @@ public class MainActivity extends Activity {
         }
     }
 
-    private String logPermissionSummary() {
-        String storage = canWritePublicLogDir() ? "/sdcard/amap_log \u53ef\u5199" : "/sdcard/amap_log \u4e0d\u53ef\u5199\uff0c\u4f1a\u56de\u9000\u5230\u5e94\u7528\u79c1\u6709\u76ee\u5f55";
-        String logs = hasPermission(Manifest.permission.READ_LOGS) ? "READ_LOGS \u5df2\u6388\u6743" : "READ_LOGS \u672a\u6388\u6743\uff0c\u666e\u901a\u7cfb\u7edf\u53ef\u80fd\u4ec5\u8fd4\u56de\u672c\u5e94\u7528\u65e5\u5fd7";
-        return storage + "\n" + logs;
+    private String storagePermissionSummary() {
+        if (canWritePublicLogDir()) {
+            return "/sdcard/amap_log 可写，保存日志会优先使用该目录";
+        }
+        return "/sdcard/amap_log 不可写，保存日志会自动回退到应用私有目录";
     }
 
     private void copyLogText(String text) {
@@ -1625,7 +1651,9 @@ public class MainActivity extends Activity {
         checkBox.setPadding(0, dp(2), 0, dp(2));
         checkBox.setOnCheckedChangeListener((CompoundButton buttonView, boolean isChecked) -> {
             saveBehaviorEnabled(key, isChecked);
-            if (KEY_HIDE_MAIN_WHEN_TARGET_FOREGROUND.equals(key) && isChecked && !hasUsageStatsAccess(this)) {
+            if ((KEY_HIDE_MAIN_WHEN_TARGET_FOREGROUND.equals(key)
+                    || KEY_SHOW_MAIN_WHEN_TARGET_FOREGROUND.equals(key))
+                    && isChecked && !hasUsageStatsAccess(this)) {
                 Toast.makeText(this, "请为 AMap Companion 开启使用情况访问权限", Toast.LENGTH_LONG).show();
                 openUsageAccessSettings();
             }
@@ -1968,6 +1996,10 @@ public class MainActivity extends Activity {
 
     static boolean isHideMainWhenTargetForegroundEnabled(android.content.Context context) {
         return isBehaviorEnabled(context, KEY_HIDE_MAIN_WHEN_TARGET_FOREGROUND);
+    }
+
+    static boolean isShowMainWhenTargetForegroundEnabled(android.content.Context context) {
+        return isBehaviorEnabled(context, KEY_SHOW_MAIN_WHEN_TARGET_FOREGROUND);
     }
 
     static boolean isHideClusterWhenInactiveEnabled(android.content.Context context) {
