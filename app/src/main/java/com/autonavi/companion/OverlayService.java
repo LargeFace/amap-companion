@@ -1421,6 +1421,7 @@ public class OverlayService extends Service {
         if (targetBroadcastChanged) {
             ensureOverlay();
             syncMainOverlayAttachment();
+            ensureClusterMirror();
         }
         Bundle extras = intent.getExtras();
         Log.d(TAG, "recv action=" + action + " extras=" + describeExtras(extras));

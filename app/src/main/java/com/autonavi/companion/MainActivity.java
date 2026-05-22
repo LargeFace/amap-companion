@@ -223,6 +223,7 @@ public class MainActivity extends Activity {
         rightColumn.addView(settings, new LinearLayout.LayoutParams(-1, -2));
         addOverlayScaleControls(settings);
         addClusterMirrorControls(settings);
+        addOverlayTargetControls(settings);
         addOverlayContentControls(settings);
         addBehaviorControls(settings);
         addOpenSourceSection(wideLayout ? leftColumn : rightColumn, wideLayout);
@@ -236,11 +237,11 @@ public class MainActivity extends Activity {
                     button("\u9009\u62e9\u76ee\u6807\u5e94\u7528", v -> chooseTargetApp(), 0xFF2563EB),
                     button("\u6388\u6743\u60ac\u6d6e\u7a97", v -> requestOverlayPermission(), 0xFF475569));
             addButtonPair(parent,
-                    button("\u542f\u52a8\u60ac\u6d6e\u7a97", v -> enableMainOverlay(), 0xFF0F766E),
-                    button("\u5173\u95ed\u60ac\u6d6e\u7a97", v -> stopOverlayService(), 0xFFB45309));
+                    button("\u542f\u52a8\u4f34\u4fa3\u670d\u52a1", v -> startCompanionService(), 0xFF0F766E),
+                    button("\u5173\u95ed\u4f34\u4fa3\u670d\u52a1", v -> stopCompanionService(), 0xFFB45309));
             addButtonPair(parent,
-                    button(clusterMirrorButtonText(), v -> toggleClusterMirror((Button) v), 0xFF7C3AED),
-                    button("\u6253\u5f00\u76ee\u6807\u5e94\u7528", v -> openTargetApp(), 0xFF111827));
+                    button("\u6253\u5f00\u76ee\u6807\u5e94\u7528", v -> openTargetApp(), 0xFF111827),
+                    null);
             addButtonPair(parent,
                     button("\u9009\u62e9\u4e0b\u8f7d\u6e20\u9053", v -> chooseUpdateChannel(), 0xFF334155),
                     button("\u68c0\u67e5\u66f4\u65b0", v -> checkForUpdates(true), 0xFF059669));
@@ -251,9 +252,8 @@ public class MainActivity extends Activity {
         }
         parent.addView(button("\u9009\u62e9\u76ee\u6807\u5e94\u7528", v -> chooseTargetApp(), 0xFF2563EB));
         parent.addView(button("\u6388\u6743\u60ac\u6d6e\u7a97", v -> requestOverlayPermission(), 0xFF475569));
-        parent.addView(button("\u542f\u52a8\u60ac\u6d6e\u7a97", v -> enableMainOverlay(), 0xFF0F766E));
-        parent.addView(button("\u5173\u95ed\u60ac\u6d6e\u7a97", v -> stopOverlayService(), 0xFFB45309));
-        parent.addView(button(clusterMirrorButtonText(), v -> toggleClusterMirror((Button) v), 0xFF7C3AED));
+        parent.addView(button("\u542f\u52a8\u4f34\u4fa3\u670d\u52a1", v -> startCompanionService(), 0xFF0F766E));
+        parent.addView(button("\u5173\u95ed\u4f34\u4fa3\u670d\u52a1", v -> stopCompanionService(), 0xFFB45309));
         parent.addView(button("\u6253\u5f00\u76ee\u6807\u5e94\u7528", v -> openTargetApp(), 0xFF111827));
         parent.addView(button("\u9009\u62e9\u4e0b\u8f7d\u6e20\u9053", v -> chooseUpdateChannel(), 0xFF334155));
         parent.addView(button("\u68c0\u67e5\u66f4\u65b0", v -> checkForUpdates(true), 0xFF059669));
@@ -458,6 +458,40 @@ public class MainActivity extends Activity {
         downRow.setGravity(Gravity.CENTER);
         downRow.addView(directionButton("\u4e0b", v -> moveClusterBy(0, dp(16))));
         box.addView(downRow, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, dp(8), 0, 0);
+        parent.addView(box, lp);
+    }
+
+    private void addOverlayTargetControls(LinearLayout parent) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(2), dp(12), dp(2), 0);
+
+        TextView title = new TextView(this);
+        title.setText("\u60ac\u6d6e\u7a97\u663e\u793a\u4f4d\u7f6e");
+        title.setTextSize(14f);
+        title.setTextColor(0xFF111827);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        box.addView(title, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView hint = new TextView(this);
+        hint.setText("\u624b\u52a8\u542f\u52a8\u548c\u9ad8\u5fb7\u5e7f\u64ad\u81ea\u52a8\u663e\u793a\u65f6\uff0c\u90fd\u4f1a\u6309\u8fd9\u91cc\u7684\u9009\u9879\u663e\u793a\u4e3b\u5c4f\u6216\u526f\u5c4f\u60ac\u6d6e\u7a97\u3002");
+        hint.setTextSize(12f);
+        hint.setTextColor(0xFF64748B);
+        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+        hintLp.setMargins(0, dp(6), 0, 0);
+        box.addView(hint, hintLp);
+
+        if (isWideLayout()) {
+            addTogglePair(box,
+                    overlayTargetToggle("\u4e3b\u5c4f\u60ac\u6d6e\u7a97", KEY_MAIN_OVERLAY_ENABLED),
+                    overlayTargetToggle("\u526f\u5c4f\u60ac\u6d6e\u7a97", KEY_CLUSTER_MIRROR_ENABLED));
+        } else {
+            box.addView(overlayTargetToggle("\u4e3b\u5c4f\u60ac\u6d6e\u7a97", KEY_MAIN_OVERLAY_ENABLED));
+            box.addView(overlayTargetToggle("\u526f\u5c4f\u60ac\u6d6e\u7a97", KEY_CLUSTER_MIRROR_ENABLED));
+        }
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, dp(8), 0, 0);
@@ -1037,35 +1071,21 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void stopOverlayService() {
-        saveMainOverlayEnabled(false);
-        notifyMainOverlayChanged();
-        stopServiceIfNoVisuals();
-    }
-
-    private void enableMainOverlay() {
+    private void startCompanionService() {
         saveMainOverlayEnabled(true);
         startOverlayService();
         notifyMainOverlayChanged();
+        notifyClusterMirrorChanged();
+        Toast.makeText(this, "\u5df2\u6309\u9009\u9879\u542f\u52a8\u4f34\u4fa3\u670d\u52a1", Toast.LENGTH_SHORT).show();
     }
 
-    private String clusterMirrorButtonText() {
-        return isClusterMirrorEnabled(this) ? "\u5173\u95ed\u4eea\u8868\u76d8\u955c\u50cf" : "\u5f00\u542f\u4eea\u8868\u76d8\u955c\u50cf";
-    }
-
-    private void toggleClusterMirror(Button button) {
-        boolean enabled = !isClusterMirrorEnabled(this);
-        getSharedPreferences(PREFS, MODE_PRIVATE)
-                .edit()
-                .putBoolean(KEY_CLUSTER_MIRROR_ENABLED, enabled)
-                .apply();
-        button.setText(clusterMirrorButtonText());
-        startOverlayService();
+    private void stopCompanionService() {
+        saveMainOverlayEnabled(false);
+        saveClusterMirrorEnabled(false);
+        notifyMainOverlayChanged();
         notifyClusterMirrorChanged();
         stopServiceIfNoVisuals();
-        Toast.makeText(this,
-                enabled ? "\u5df2\u5f00\u542f\u4eea\u8868\u76d8\u955c\u50cf" : "\u5df2\u5173\u95ed\u4eea\u8868\u76d8\u955c\u50cf",
-                Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "\u5df2\u5173\u95ed\u4f34\u4fa3\u670d\u52a1", Toast.LENGTH_SHORT).show();
     }
 
     private void requestOverlayPermission() {
@@ -1662,6 +1682,33 @@ public class MainActivity extends Activity {
         return checkBox;
     }
 
+    private CheckBox overlayTargetToggle(String text, String key) {
+        CheckBox checkBox = new CheckBox(this);
+        checkBox.setText(text);
+        checkBox.setChecked(KEY_CLUSTER_MIRROR_ENABLED.equals(key)
+                ? isClusterMirrorEnabled(this)
+                : isMainOverlayEnabled(this));
+        checkBox.setTextSize(14f);
+        checkBox.setTextColor(0xFF0F172A);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            checkBox.setButtonTintList(android.content.res.ColorStateList.valueOf(0xFF2563EB));
+        }
+        checkBox.setPadding(0, dp(2), 0, dp(2));
+        checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (KEY_CLUSTER_MIRROR_ENABLED.equals(key)) {
+                saveClusterMirrorEnabled(isChecked);
+                startOverlayService();
+                notifyClusterMirrorChanged();
+            } else {
+                saveMainOverlayEnabled(isChecked);
+                startOverlayService();
+                notifyMainOverlayChanged();
+            }
+            stopServiceIfNoVisuals();
+        });
+        return checkBox;
+    }
+
     private void openUsageAccessSettings() {
         try {
             startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
@@ -1857,6 +1904,13 @@ public class MainActivity extends Activity {
                 .apply();
     }
 
+    private void saveClusterMirrorEnabled(boolean enabled) {
+        getSharedPreferences(PREFS, MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_CLUSTER_MIRROR_ENABLED, enabled)
+                .apply();
+    }
+
     private void notifyMainOverlayChanged() {
         Intent intent = new Intent(ACTION_MAIN_OVERLAY_CHANGED);
         intent.setPackage(getPackageName());
@@ -1888,7 +1942,9 @@ public class MainActivity extends Activity {
     }
 
     private void stopServiceIfNoVisuals() {
-        if (!isMainOverlayEnabled(this) && !isClusterMirrorEnabled(this)) {
+        if (!isMainOverlayEnabled(this)
+                && !isClusterMirrorEnabled(this)
+                && !isShowMainWhenTargetForegroundEnabled(this)) {
             stopService(new Intent(this, OverlayService.class));
         }
     }
