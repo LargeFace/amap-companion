@@ -2389,6 +2389,7 @@ public class OverlayService extends Service {
     }
 
     private int turnIconResource(int icon) {
+        icon = compatibleTurnIcon(icon);
         if (icon <= 0) {
             return 0;
         }
@@ -2406,6 +2407,7 @@ public class OverlayService extends Service {
     }
 
     private int fallbackTurnIconResource(int icon) {
+        icon = compatibleTurnIcon(icon);
         switch (icon) {
             case 2:
                 return R.drawable.turn_left;
@@ -2430,6 +2432,18 @@ public class OverlayService extends Service {
             default:
                 return R.drawable.turn_straight;
         }
+    }
+
+    private int compatibleTurnIcon(int icon) {
+        // AutoNavi broadcasts action codes, not drawable ids. Its own GuideInfoProtocolData
+        // switchIcon() maps these extension actions back to base turn icons on supported builds.
+        if (icon == 65) {
+            return 4;
+        }
+        if (icon == 66) {
+            return 5;
+        }
+        return icon;
     }
 
     private void updateModeFromExtras(Bundle extras) {
@@ -3505,6 +3519,7 @@ public class OverlayService extends Service {
     }
 
     private int turnIconToTrafficDir(int icon) {
+        icon = compatibleTurnIcon(icon);
         if (icon == 2 || icon == 4 || icon == 6) {
             return 1;
         }
