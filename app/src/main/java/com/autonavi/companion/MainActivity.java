@@ -837,21 +837,45 @@ public class MainActivity extends Activity {
         return panel;
     }
 
-    private TextView previewLight(String text, int color) {
-        TextView view = new TextView(this);
-        view.setText(text);
-        view.setTextSize(10f);
-        view.setTypeface(Typeface.DEFAULT_BOLD);
-        view.setTextColor(Color.WHITE);
+    private View previewLight(String text, int color) {
+        LinearLayout view = new LinearLayout(this);
+        view.setOrientation(LinearLayout.HORIZONTAL);
         view.setGravity(Gravity.CENTER);
-        view.setMinWidth(dp(31));
-        view.setMinHeight(dp(18));
-        view.setPadding(dp(5), 0, dp(5), 0);
+        view.setMinimumWidth(dp(56));
+        view.setMinimumHeight(dp(27));
+        view.setPadding(dp(4), dp(3), dp(7), dp(3));
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(color);
-        bg.setCornerRadius(dp(9));
+        bg.setOrientation(GradientDrawable.Orientation.LEFT_RIGHT);
+        bg.setColors(new int[]{withAlpha(color, 34), 0xDD111827});
+        bg.setCornerRadius(dp(12));
+        bg.setStroke(dp(1), withAlpha(color, 78));
         view.setBackground(bg);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(18));
+
+        TextView arrow = new TextView(this);
+        arrow.setText(text.length() > 0 ? text.substring(0, 1) : "\u2191");
+        arrow.setTextSize(13f);
+        arrow.setTypeface(Typeface.DEFAULT_BOLD);
+        arrow.setTextColor(Color.WHITE);
+        arrow.setGravity(Gravity.CENTER);
+        GradientDrawable arrowBg = new GradientDrawable();
+        arrowBg.setShape(GradientDrawable.OVAL);
+        arrowBg.setColor(color);
+        arrowBg.setStroke(dp(2), 0xBBFFFFFF);
+        arrow.setBackground(arrowBg);
+        LinearLayout.LayoutParams arrowLp = new LinearLayout.LayoutParams(dp(19), dp(19));
+        arrowLp.setMargins(0, 0, dp(5), 0);
+        view.addView(arrow, arrowLp);
+
+        TextView label = new TextView(this);
+        int space = text.indexOf(' ');
+        label.setText(space >= 0 ? text.substring(space + 1) : text);
+        label.setTextSize(11.5f);
+        label.setTypeface(Typeface.DEFAULT_BOLD);
+        label.setTextColor(Color.WHITE);
+        label.setGravity(Gravity.CENTER);
+        view.addView(label, new LinearLayout.LayoutParams(-2, -2));
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(24));
         lp.setMargins(dp(2), dp(2), dp(2), dp(2));
         view.setLayoutParams(lp);
         return view;

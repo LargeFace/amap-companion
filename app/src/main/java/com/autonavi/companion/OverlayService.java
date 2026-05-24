@@ -2647,40 +2647,85 @@ public class OverlayService extends Service {
         return best;
     }
 
-    private TextView lightPill(LightState state, boolean showDirectionLabel) {
+    private View lightPill(LightState state, boolean showDirectionLabel) {
         return lightPill(this, state, showDirectionLabel);
     }
 
-    private TextView lightPill(Context context, LightState state, boolean showDirectionLabel) {
+    private View lightPill(Context context, LightState state, boolean showDirectionLabel) {
         return lightPill(context, state, showDirectionLabel, overlayScale);
     }
 
-    private TextView lightPill(Context context, LightState state, boolean showDirectionLabel, float scale) {
+    private View lightPill(Context context, LightState state, boolean showDirectionLabel, float scale) {
         return lightPill(context, state, showDirectionLabel, scale,
                 currentLightSeconds(state, System.currentTimeMillis()));
     }
 
-    private TextView lightPill(Context context, LightState state, boolean showDirectionLabel,
-                               float scale, int seconds) {
+    private View lightPill(Context context, LightState state, boolean showDirectionLabel,
+                           float scale, int seconds) {
         float oldDensity = activeDensity;
         activeDensity = context.getResources().getDisplayMetrics().density;
         try {
-            TextView view = new TextView(context);
-            view.setTextColor(Color.WHITE);
-            view.setTextSize(scaledSp(20f, scale));
-            view.setTypeface(Typeface.DEFAULT_BOLD);
+            LinearLayout view = new LinearLayout(context);
+            view.setOrientation(LinearLayout.HORIZONTAL);
             view.setGravity(Gravity.CENTER);
-            view.setMinWidth(scaledDp(inCruiseMode ? 62 : 54, scale));
-            view.setMinHeight(scaledDp(34, scale));
-            view.setPadding(scaledDp(12, scale), 0, scaledDp(12, scale), scaledDp(1, scale));
-            String label = showDirectionLabel && state.dir >= 0 ? directionLabel(state.dir) : "";
-            view.setText(label + seconds + "s");
+            boolean showArrowBadge = showDirectionLabel && state.dir >= 0;
+            view.setMinimumWidth(scaledDp(showArrowBadge ? 94 : 70, scale));
+            view.setMinimumHeight(scaledDp(44, scale));
+            view.setPadding(scaledDp(showArrowBadge ? 7 : 9, scale), scaledDp(5, scale),
+                    scaledDp(showArrowBadge ? 12 : 11, scale), scaledDp(5, scale));
+
             GradientDrawable bg = new GradientDrawable();
-            bg.setColor(state.color);
-            bg.setCornerRadius(scaledDp(18, scale));
+            bg.setOrientation(GradientDrawable.Orientation.LEFT_RIGHT);
+            bg.setColors(new int[]{withAlpha(state.color, 34), withAlpha(0xFF111827, 82)});
+            bg.setCornerRadius(scaledDp(22, scale));
+            bg.setStroke(scaledDp(1, scale), withAlpha(state.color, 78));
             view.setBackground(bg);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, scaledDp(36, scale));
-            lp.setMargins(scaledDp(3, scale), scaledDp(3, scale), scaledDp(3, scale), scaledDp(3, scale));
+
+            if (showArrowBadge) {
+                TextView arrow = new TextView(context);
+                arrow.setText(directionLabel(state.dir));
+                arrow.setTextColor(Color.WHITE);
+                arrow.setTextSize(scaledSp(22f, scale));
+                arrow.setTypeface(Typeface.DEFAULT_BOLD);
+                arrow.setGravity(Gravity.CENTER);
+                GradientDrawable arrowBg = new GradientDrawable();
+                arrowBg.setShape(GradientDrawable.OVAL);
+                arrowBg.setColor(state.color);
+                arrowBg.setStroke(scaledDp(3, scale), withAlpha(0xFFFFFFFF, 76));
+                arrow.setBackground(arrowBg);
+                LinearLayout.LayoutParams arrowLp = new LinearLayout.LayoutParams(
+                        scaledDp(30, scale), scaledDp(30, scale));
+                arrowLp.setMargins(0, 0, scaledDp(8, scale), 0);
+                view.addView(arrow, arrowLp);
+            } else {
+                TextView dot = new TextView(context);
+                GradientDrawable dotBg = new GradientDrawable();
+                dotBg.setShape(GradientDrawable.OVAL);
+                dotBg.setColor(state.color);
+                dotBg.setStroke(scaledDp(2, scale), withAlpha(0xFFFFFFFF, 72));
+                dot.setBackground(dotBg);
+                LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(
+                        scaledDp(16, scale), scaledDp(16, scale));
+                dotLp.setMargins(0, 0, scaledDp(8, scale), 0);
+                view.addView(dot, dotLp);
+            }
+
+            LinearLayout textColumn = new LinearLayout(context);
+            textColumn.setOrientation(LinearLayout.VERTICAL);
+            textColumn.setGravity(Gravity.CENTER);
+
+            TextView time = new TextView(context);
+            time.setText(seconds + "s");
+            time.setTextColor(Color.WHITE);
+            time.setTextSize(scaledSp(showArrowBadge ? 22.5f : 20.5f, scale));
+            time.setTypeface(Typeface.DEFAULT_BOLD);
+            time.setGravity(Gravity.CENTER);
+            textColumn.addView(time, new LinearLayout.LayoutParams(-2, -2));
+
+            view.addView(textColumn, new LinearLayout.LayoutParams(-2, -2));
+
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, scaledDp(44, scale));
+            lp.setMargins(scaledDp(4, scale), scaledDp(3, scale), scaledDp(4, scale), scaledDp(3, scale));
             view.setLayoutParams(lp);
             return view;
         } finally {
