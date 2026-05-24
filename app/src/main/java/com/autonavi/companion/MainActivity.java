@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
     static final String TEXT_MODE_AUTO = "auto";
     static final String OVERLAY_UI_OLD = "old";
     static final String OVERLAY_UI_NEW = "new";
-    static final String OVERLAY_UI_CARD = "card";
+    static final String OVERLAY_UI_DYNAMIC_ISLAND = "card";
     static final int MIN_BACKGROUND_OPACITY_PERCENT = 0;
     static final int MAX_BACKGROUND_OPACITY_PERCENT = 90;
     static final int DEFAULT_BACKGROUND_OPACITY_PERCENT = 90;
@@ -1912,8 +1912,8 @@ public class MainActivity extends Activity {
 
     private String overlayUiStyleButtonText() {
         String style = getOverlayUiStyle(this);
-        if (OVERLAY_UI_CARD.equals(style)) {
-            return "\u60ac\u6d6e\u7a97\u6837\u5f0f\uff1a\u65b0 UI-1\uff08\u5361\u7247\u6837\u5f0f\uff09";
+        if (OVERLAY_UI_DYNAMIC_ISLAND.equals(style)) {
+            return "\u60ac\u6d6e\u7a97\u6837\u5f0f\uff1a\u7075\u52a8\u5c9b\uff08\u6d4b\u8bd5\uff09";
         }
         if (OVERLAY_UI_NEW.equals(style)) {
             return "\u60ac\u6d6e\u7a97\u6837\u5f0f\uff1a\u65b0 UI\uff08\u6d4b\u8bd5\u4e2d\uff09";
@@ -1924,17 +1924,17 @@ public class MainActivity extends Activity {
     private void chooseOverlayUiStyle() {
         String[] labels = {
                 "\u65e7 UI\uff08\u9ed8\u8ba4\uff09",
-                "\u65b0 UI\uff08\u5361\u7247\u6837\u5f0f\uff0c\u6d4b\u8bd5\u4e2d\uff09",
-                "\u65b0 UI-1\uff08\u5361\u7247\u7b80\u6d01\u6837\u5f0f\uff09"
+                "\u7075\u52a8\u5c9b\uff08\u6d4b\u8bd5\uff09",
+                "\u65b0 UI\uff08\u5361\u7247\u6837\u5f0f\uff0c\u6d4b\u8bd5\u4e2d\uff09"
         };
         String currentStyle = getOverlayUiStyle(this);
-        int checked = OVERLAY_UI_CARD.equals(currentStyle) ? 2
-                : OVERLAY_UI_NEW.equals(currentStyle) ? 1 : 0;
+        int checked = OVERLAY_UI_DYNAMIC_ISLAND.equals(currentStyle) ? 1
+                : OVERLAY_UI_NEW.equals(currentStyle) ? 2 : 0;
         new AlertDialog.Builder(this)
                 .setTitle("\u9009\u62e9\u60ac\u6d6e\u7a97\u6837\u5f0f")
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
-                    String style = which == 2 ? OVERLAY_UI_CARD
-                            : which == 1 ? OVERLAY_UI_NEW : OVERLAY_UI_OLD;
+                    String style = which == 1 ? OVERLAY_UI_DYNAMIC_ISLAND
+                            : which == 2 ? OVERLAY_UI_NEW : OVERLAY_UI_OLD;
                     saveOverlayUiStyle(style);
                     applyOverlayPreviewStyle();
                     notifyOverlayStyleChanged();
@@ -1973,7 +1973,7 @@ public class MainActivity extends Activity {
         getSharedPreferences(PREFS, MODE_PRIVATE)
                 .edit()
                 .putString(KEY_OVERLAY_UI_STYLE,
-                        OVERLAY_UI_CARD.equals(style) ? OVERLAY_UI_CARD
+                        OVERLAY_UI_DYNAMIC_ISLAND.equals(style) ? OVERLAY_UI_DYNAMIC_ISLAND
                         : OVERLAY_UI_NEW.equals(style) ? OVERLAY_UI_NEW : OVERLAY_UI_OLD)
                 .apply();
     }
@@ -2270,11 +2270,11 @@ public class MainActivity extends Activity {
 
     static boolean isNewOverlayUiEnabled(android.content.Context context) {
         String style = getOverlayUiStyle(context);
-        return OVERLAY_UI_NEW.equals(style) || OVERLAY_UI_CARD.equals(style);
+        return OVERLAY_UI_NEW.equals(style) || OVERLAY_UI_DYNAMIC_ISLAND.equals(style);
     }
 
-    static boolean isCardOverlayUiEnabled(android.content.Context context) {
-        return OVERLAY_UI_CARD.equals(getOverlayUiStyle(context));
+    static boolean isDynamicIslandUiEnabled(android.content.Context context) {
+        return OVERLAY_UI_DYNAMIC_ISLAND.equals(getOverlayUiStyle(context));
     }
 
     static boolean usesDarkTextPalette(android.content.Context context) {
@@ -2301,7 +2301,7 @@ public class MainActivity extends Activity {
     static String getOverlayUiStyle(android.content.Context context) {
         String style = context.getSharedPreferences(PREFS, MODE_PRIVATE)
                 .getString(KEY_OVERLAY_UI_STYLE, OVERLAY_UI_OLD);
-        if (OVERLAY_UI_CARD.equals(style)) return OVERLAY_UI_CARD;
+        if (OVERLAY_UI_DYNAMIC_ISLAND.equals(style)) return OVERLAY_UI_DYNAMIC_ISLAND;
         if (OVERLAY_UI_NEW.equals(style)) return OVERLAY_UI_NEW;
         return OVERLAY_UI_OLD;
     }
