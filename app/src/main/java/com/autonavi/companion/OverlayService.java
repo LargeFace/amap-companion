@@ -12,6 +12,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.display.DisplayManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
@@ -20,6 +22,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -31,6 +34,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -40,7 +44,9 @@ import org.json.JSONObject;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -56,6 +62,7 @@ public class OverlayService extends Service {
     private static final String ACTION_RECV = "AUTONAVI_STANDARD_BROADCAST_RECV";
     private static final int KEY_TRAFFIC_LIGHT_COUNTDOWN = 60073;
     private static final long ALERT_TTL_MS = 5000L;
+    private static final String DIY_DIR_NAME = "amap_companion/diy";
     private static final long LIGHT_TTL_MS = 4500L;
     private static final long LIGHT_TICK_MS = 1000L;
     private static final long DISPLAY_POLICY_POLL_MS = 1500L;
@@ -116,6 +123,8 @@ public class OverlayService extends Service {
     private boolean clusterMirrorEnabled;
     private int clusterMirrorRetryCount;
     private final HashMap<Integer, LightState> trafficLights = new HashMap<>();
+    private final HashMap<String, Bitmap> diyArrowCache = new HashMap<>();
+    private final HashMap<String, Long> diyArrowModified = new HashMap<>();
     private boolean inCruiseMode;
     private float downRawX;
     private float downRawY;
@@ -138,6 +147,8 @@ public class OverlayService extends Service {
     private int currentLimitSpeed = -1;
     private long alertUpdatedAt;
     private int navigationTurnDir = -1;
+    private int[] lastLaneData;
+    private boolean[] lastLaneAdvised;
     private float overlayScale = 2f;
     private float clusterScale = 2f;
     private float activeDensity = -1f;
@@ -266,6 +277,7 @@ public class OverlayService extends Service {
         filter.addAction(MainActivity.ACTION_MAIN_OVERLAY_CHANGED);
         filter.addAction(MainActivity.ACTION_OVERLAY_SCALE_CHANGED);
         filter.addAction(MainActivity.ACTION_CLUSTER_MIRROR_CHANGED);
+        filter.addAction(MainActivity.ACTION_CLUSTER_POSITION_CHANGED);
         filter.addAction(MainActivity.ACTION_OVERLAY_CONTENT_CHANGED);
         filter.addAction(MainActivity.ACTION_OVERLAY_STYLE_CHANGED);
         filter.addAction(MainActivity.ACTION_DISPLAY_POLICY_CHANGED);
@@ -959,9 +971,11 @@ public class OverlayService extends Service {
         float oldDensity = activeDensity;
         activeDensity = context.getResources().getDisplayMetrics().density;
         try {
-            return MainActivity.isNewOverlayUiEnabled(this)
+            LinearLayout panel = MainActivity.isNewOverlayUiEnabled(this)
                     ? buildDashboardPanel(context, scale, cluster)
                     : buildClassicPanel(context, scale, cluster);
+            FontManager.applyToViewTree(context, panel);
+            return panel;
         } finally {
             activeDensity = oldDensity;
         }
@@ -1005,6 +1019,17 @@ public class OverlayService extends Service {
         } catch (Throwable t) {
             Log.e(TAG, "cluster position update failed", t);
         }
+    }
+
+    private void applySavedClusterPosition() {
+        if (clusterWindowManager == null || clusterPanel == null || clusterParams == null) {
+            ensureClusterMirror();
+            return;
+        }
+        clusterParams.x = getSavedClusterX();
+        clusterParams.y = getSavedClusterY();
+        updateClusterPosition();
+        saveClusterPosition();
     }
 
     private void dismissClusterMirror() {
@@ -1287,6 +1312,7 @@ public class OverlayService extends Service {
         copyTextState(alertText, clusterAlertText);
         copyTextState(detailText, clusterDetailText);
         copyVisibility(laneSection, clusterLaneSection);
+        applyCachedLaneData();
         renderTrafficLights();
         applyContentVisibilityPrefs();
         updateClusterPosition();
@@ -1440,6 +1466,10 @@ public class OverlayService extends Service {
             clusterScale = -1f;
             ensureClusterMirror();
             stopSelfIfNoVisuals();
+            return;
+        }
+        if (MainActivity.ACTION_CLUSTER_POSITION_CHANGED.equals(action)) {
+            applySavedClusterPosition();
             return;
         }
         if (MainActivity.ACTION_OVERLAY_STYLE_CHANGED.equals(action)) {
@@ -2669,32 +2699,22 @@ public class OverlayService extends Service {
             view.setOrientation(LinearLayout.HORIZONTAL);
             view.setGravity(Gravity.CENTER);
             boolean showArrowBadge = showDirectionLabel && state.dir >= 0;
-            view.setMinimumWidth(scaledDp(showArrowBadge ? 94 : 70, scale));
+            view.setMinimumWidth(scaledDp(94, scale));
             view.setMinimumHeight(scaledDp(44, scale));
             view.setPadding(scaledDp(showArrowBadge ? 7 : 9, scale), scaledDp(5, scale),
                     scaledDp(showArrowBadge ? 12 : 11, scale), scaledDp(5, scale));
 
             GradientDrawable bg = new GradientDrawable();
             bg.setOrientation(GradientDrawable.Orientation.LEFT_RIGHT);
-            bg.setColors(new int[]{withAlpha(state.color, 34), withAlpha(0xFF111827, 82)});
+            bg.setColors(new int[]{withAlpha(state.color, 34), withAlpha(state.color, 0)});
             bg.setCornerRadius(scaledDp(22, scale));
             bg.setStroke(scaledDp(1, scale), withAlpha(state.color, 78));
             view.setBackground(bg);
 
             if (showArrowBadge) {
-                TextView arrow = new TextView(context);
-                arrow.setText(directionLabel(state.dir));
-                arrow.setTextColor(Color.WHITE);
-                arrow.setTextSize(scaledSp(22f, scale));
-                arrow.setTypeface(Typeface.DEFAULT_BOLD);
-                arrow.setGravity(Gravity.CENTER);
-                GradientDrawable arrowBg = new GradientDrawable();
-                arrowBg.setShape(GradientDrawable.OVAL);
-                arrowBg.setColor(state.color);
-                arrowBg.setStroke(scaledDp(3, scale), withAlpha(0xFFFFFFFF, 76));
-                arrow.setBackground(arrowBg);
+                View arrow = diyArrowBadge(context, state, scale);
                 LinearLayout.LayoutParams arrowLp = new LinearLayout.LayoutParams(
-                        scaledDp(30, scale), scaledDp(30, scale));
+                        scaledDp(32, scale), scaledDp(32, scale));
                 arrowLp.setMargins(0, 0, scaledDp(8, scale), 0);
                 view.addView(arrow, arrowLp);
             } else {
@@ -2702,10 +2722,10 @@ public class OverlayService extends Service {
                 GradientDrawable dotBg = new GradientDrawable();
                 dotBg.setShape(GradientDrawable.OVAL);
                 dotBg.setColor(state.color);
-                dotBg.setStroke(scaledDp(2, scale), withAlpha(0xFFFFFFFF, 72));
+                dotBg.setStroke(scaledDp(3, scale), withAlpha(0xFFFFFFFF, 76));
                 dot.setBackground(dotBg);
                 LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(
-                        scaledDp(16, scale), scaledDp(16, scale));
+                        scaledDp(32, scale), scaledDp(32, scale));
                 dotLp.setMargins(0, 0, scaledDp(8, scale), 0);
                 view.addView(dot, dotLp);
             }
@@ -2717,7 +2737,7 @@ public class OverlayService extends Service {
             TextView time = new TextView(context);
             time.setText(seconds + "s");
             time.setTextColor(Color.WHITE);
-            time.setTextSize(scaledSp(showArrowBadge ? 22.5f : 20.5f, scale));
+            time.setTextSize(scaledSp(22.5f, scale));
             time.setTypeface(Typeface.DEFAULT_BOLD);
             time.setGravity(Gravity.CENTER);
             textColumn.addView(time, new LinearLayout.LayoutParams(-2, -2));
@@ -2727,10 +2747,94 @@ public class OverlayService extends Service {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, scaledDp(44, scale));
             lp.setMargins(scaledDp(4, scale), scaledDp(3, scale), scaledDp(4, scale), scaledDp(3, scale));
             view.setLayoutParams(lp);
+            FontManager.applyToViewTree(context, view);
             return view;
         } finally {
             activeDensity = oldDensity;
         }
+    }
+
+    private View diyArrowBadge(Context context, LightState state, float scale) {
+        Bitmap bitmap = loadDiyArrowBitmap(state.dir);
+        if (bitmap != null) {
+            ImageView image = new ImageView(context);
+            image.setImageBitmap(bitmap);
+            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            image.setAdjustViewBounds(false);
+            image.setPadding(scaledDp(1, scale), scaledDp(1, scale), scaledDp(1, scale), scaledDp(1, scale));
+            return image;
+        }
+
+        TextView arrow = new TextView(context);
+        arrow.setText(directionLabel(state.dir));
+        arrow.setTextColor(Color.WHITE);
+        arrow.setTextSize(scaledSp(23f, scale));
+        arrow.setTypeface(Typeface.DEFAULT_BOLD);
+        arrow.setGravity(Gravity.CENTER);
+        GradientDrawable arrowBg = new GradientDrawable();
+        arrowBg.setShape(GradientDrawable.OVAL);
+        arrowBg.setColor(state.color);
+        arrowBg.setStroke(scaledDp(3, scale), withAlpha(0xFFFFFFFF, 76));
+        arrow.setBackground(arrowBg);
+        return arrow;
+    }
+
+    private Bitmap loadDiyArrowBitmap(int dir) {
+        String[] fileNames = diyArrowFileNames(dir);
+        if (fileNames.length == 0) {
+            return null;
+        }
+        File diyDir = new File(Environment.getExternalStorageDirectory(), DIY_DIR_NAME);
+        try {
+            if (!diyDir.isDirectory()) {
+                diyDir.mkdirs();
+            }
+        } catch (Throwable ignored) {
+        }
+        for (String fileName : fileNames) {
+            try {
+                File file = new File(diyDir, fileName);
+                if (!file.isFile()) {
+                    diyArrowCache.remove(fileName);
+                    diyArrowModified.remove(fileName);
+                    continue;
+                }
+                long modified = file.lastModified();
+                Long cachedModified = diyArrowModified.get(fileName);
+                Bitmap cached = diyArrowCache.get(fileName);
+                if (cached != null && cachedModified != null && cachedModified == modified && !cached.isRecycled()) {
+                    return cached;
+                }
+                Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
+                if (bitmap == null) {
+                    diyArrowCache.remove(fileName);
+                    diyArrowModified.remove(fileName);
+                    continue;
+                }
+                diyArrowCache.put(fileName, bitmap);
+                diyArrowModified.put(fileName, modified);
+                return bitmap;
+            } catch (Throwable t) {
+                Log.d(TAG, "load diy arrow failed: " + fileName, t);
+            }
+        }
+        return null;
+    }
+
+    private String[] diyArrowFileNames(int dir) {
+        String base;
+        if (dir == 1 || dir == 5 || dir == 6) {
+            base = "cruise_arrow_left";
+        } else if (dir == 2 || dir == 3 || dir == 7 || dir == 8) {
+            base = "cruise_arrow_right";
+        } else if (dir == 4) {
+            base = "cruise_arrow_straight";
+        } else if (dir == 0) {
+            base = "cruise_arrow_uturn";
+        } else {
+            base = "cruise_arrow_default";
+        }
+        return new String[]{base + ".png", base + ".webp", base + ".jpg", base + ".jpeg"};
     }
 
     private int currentLightSeconds(LightState state, long now) {
@@ -3185,13 +3289,11 @@ public class OverlayService extends Service {
     }
 
     private void showLaneData(int[] lanes, boolean[] advised) {
-        if (laneBar == null) {
+        cacheLaneData(lanes, advised);
+        if (laneBar == null && clusterLaneBar == null) {
             return;
         }
-        laneBar.setLaneData(lanes, advised);
-        if (clusterLaneBar != null) {
-            clusterLaneBar.setLaneData(lanes, advised);
-        }
+        applyCachedLaneData();
         syncLaneVisibility();
         if (MainActivity.isLaneVisible(this)) {
             showAnyPanel();
@@ -3199,6 +3301,8 @@ public class OverlayService extends Service {
     }
 
     private void hideLaneData() {
+        lastLaneData = null;
+        lastLaneAdvised = null;
         if (laneBar != null) {
             laneBar.hideLane();
         }
@@ -3210,6 +3314,28 @@ public class OverlayService extends Service {
         }
         if (clusterLaneSection != null) {
             clusterLaneSection.setVisibility(View.GONE);
+        }
+    }
+
+    private void cacheLaneData(int[] lanes, boolean[] advised) {
+        if (lanes == null || lanes.length == 0) {
+            lastLaneData = null;
+            lastLaneAdvised = null;
+            return;
+        }
+        lastLaneData = Arrays.copyOf(lanes, lanes.length);
+        lastLaneAdvised = advised == null ? null : Arrays.copyOf(advised, advised.length);
+    }
+
+    private void applyCachedLaneData() {
+        if (lastLaneData == null || lastLaneData.length == 0) {
+            return;
+        }
+        if (laneBar != null) {
+            laneBar.setLaneData(lastLaneData, lastLaneAdvised);
+        }
+        if (clusterLaneBar != null) {
+            clusterLaneBar.setLaneData(lastLaneData, lastLaneAdvised);
         }
     }
 

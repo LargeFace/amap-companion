@@ -65,6 +65,7 @@ import java.util.Locale;
 
 public class MainActivity extends Activity {
     static final String PREFS = "amap_companion";
+    static final String PUBLIC_LOG_DIR = "amap_companion/log";
     static final String KEY_TARGET_PACKAGE = "target_package";
     static final String KEY_UPDATE_URL = "update_url";
     static final String KEY_UPDATE_CHANNEL = "update_channel";
@@ -96,6 +97,7 @@ public class MainActivity extends Activity {
     static final String ACTION_MAIN_OVERLAY_CHANGED = "com.autonavi.companion.MAIN_OVERLAY_CHANGED";
     static final String ACTION_OVERLAY_SCALE_CHANGED = "com.autonavi.companion.OVERLAY_SCALE_CHANGED";
     static final String ACTION_CLUSTER_MIRROR_CHANGED = "com.autonavi.companion.CLUSTER_MIRROR_CHANGED";
+    static final String ACTION_CLUSTER_POSITION_CHANGED = "com.autonavi.companion.CLUSTER_POSITION_CHANGED";
     static final String ACTION_OVERLAY_CONTENT_CHANGED = "com.autonavi.companion.OVERLAY_CONTENT_CHANGED";
     static final String ACTION_OVERLAY_STYLE_CHANGED = "com.autonavi.companion.OVERLAY_STYLE_CHANGED";
     static final String ACTION_DISPLAY_POLICY_CHANGED = "com.autonavi.companion.DISPLAY_POLICY_CHANGED";
@@ -149,7 +151,9 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         persistDefaultUpdateUrl();
         migrateOverlayStylePrefs();
-        setContentView(buildContent());
+        View content = buildContent();
+        FontManager.applyToViewTree(this, content);
+        setContentView(content);
         autoStartServiceOnAppOpen();
         targetText.postDelayed(() -> {
             checkForUpdates(false);
@@ -846,7 +850,7 @@ public class MainActivity extends Activity {
         view.setPadding(dp(4), dp(3), dp(7), dp(3));
         GradientDrawable bg = new GradientDrawable();
         bg.setOrientation(GradientDrawable.Orientation.LEFT_RIGHT);
-        bg.setColors(new int[]{withAlpha(color, 34), 0xDD111827});
+        bg.setColors(new int[]{withAlpha(color, 34), withAlpha(color, 0)});
         bg.setCornerRadius(dp(12));
         bg.setStroke(dp(1), withAlpha(color, 78));
         view.setBackground(bg);
@@ -1212,7 +1216,7 @@ public class MainActivity extends Activity {
         content.setPadding(dp(8), 0, dp(8), 0);
 
         TextView hint = new TextView(this);
-        hint.setText("\u53cd\u9988 bug \u65f6\u53ef\u63d0\u4ea4\u65e5\u5fd7\u3002\u4f18\u5148\u4fdd\u5b58\u5230 /sdcard/amap_log\uff1b\u82e5\u7cfb\u7edf\u4e0d\u6388\u6743\uff0c\u4f1a\u81ea\u52a8\u56de\u9000\u5230\u5e94\u7528\u79c1\u6709\u65e5\u5fd7\u76ee\u5f55\u3002");
+        hint.setText("\u53cd\u9988 bug \u65f6\u53ef\u63d0\u4ea4\u65e5\u5fd7\u3002\u4f18\u5148\u4fdd\u5b58\u5230 /sdcard/" + PUBLIC_LOG_DIR + "\uff1b\u82e5\u7cfb\u7edf\u4e0d\u6388\u6743\uff0c\u4f1a\u81ea\u52a8\u56de\u9000\u5230\u5e94\u7528\u79c1\u6709\u65e5\u5fd7\u76ee\u5f55\u3002");
         hint.setTextSize(13);
         hint.setTextColor(0xFF4B5563);
         hint.setPadding(dp(16), dp(6), dp(16), dp(10));
@@ -1261,6 +1265,7 @@ public class MainActivity extends Activity {
         operationRow.addView(save, new LinearLayout.LayoutParams(0, dp(42), 1f));
         operationRow.addView(copy, new LinearLayout.LayoutParams(0, dp(42), 1f));
 
+        FontManager.applyToViewTree(this, content);
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("\u65e5\u5fd7\u4e0e\u8c03\u8bd5")
                 .setView(content)
@@ -1334,7 +1339,7 @@ public class MainActivity extends Activity {
                     Toast.makeText(this, "\u65e0\u6cd5\u6253\u5f00\u6240\u6709\u6587\u4ef6\u8bbf\u95ee\u6743\u9650\u8bbe\u7f6e", Toast.LENGTH_SHORT).show();
                 }
             }
-            Toast.makeText(this, "\u8bf7\u5f00\u542f\u201c\u6240\u6709\u6587\u4ef6\u8bbf\u95ee\u6743\u9650\u201d\uff0c\u7528\u4e8e\u4fdd\u5b58\u5230 /sdcard/amap_log", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "\u8bf7\u5f00\u542f\u201c\u6240\u6709\u6587\u4ef6\u8bbf\u95ee\u6743\u9650\u201d\uff0c\u7528\u4e8e\u4fdd\u5b58\u5230 /sdcard/" + PUBLIC_LOG_DIR, Toast.LENGTH_LONG).show();
         } else if (openSettings) {
             Toast.makeText(this, storagePermissionSummary(), Toast.LENGTH_LONG).show();
         }
@@ -1361,7 +1366,7 @@ public class MainActivity extends Activity {
         sb.append("android=").append(Build.VERSION.RELEASE).append(" sdk=").append(Build.VERSION.SDK_INT).append('\n');
         sb.append("readLogsPermission=").append(hasPermission(Manifest.permission.READ_LOGS)).append('\n');
         sb.append("publicLogDirWritable=").append(canWritePublicLogDir()).append('\n');
-        sb.append("preferredLogDir=/sdcard/amap_log\n");
+        sb.append("preferredLogDir=/sdcard/").append(PUBLIC_LOG_DIR).append('\n');
         sb.append("note=Android may restrict third-party apps to their own logs only.\n\n");
         int lines = appendLogcatCommand(sb, "filtered", new String[]{
                 "logcat", "-d", "-v", "time", "-t", "1000",
@@ -1451,7 +1456,7 @@ public class MainActivity extends Activity {
     }
 
     private File resolveWritableLogDir() throws Exception {
-        File primary = new File(Environment.getExternalStorageDirectory(), "amap_log");
+        File primary = new File(Environment.getExternalStorageDirectory(), PUBLIC_LOG_DIR);
         if (ensureWritableDir(primary)) {
             return primary;
         }
@@ -1460,7 +1465,7 @@ public class MainActivity extends Activity {
             fallback = new File(getCacheDir(), "logs");
         }
         if (ensureWritableDir(fallback)) {
-            Toast.makeText(this, "\u65e0\u6cd5\u5199\u5165 /sdcard/amap_log\uff0c\u5df2\u56de\u9000\u5230\uff1a" + fallback.getAbsolutePath(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "\u65e0\u6cd5\u5199\u5165 /sdcard/" + PUBLIC_LOG_DIR + "\uff0c\u5df2\u56de\u9000\u5230\uff1a" + fallback.getAbsolutePath(), Toast.LENGTH_LONG).show();
             return fallback;
         }
         throw new IllegalStateException("no writable log dir");
@@ -1488,7 +1493,7 @@ public class MainActivity extends Activity {
     }
 
     private boolean canWritePublicLogDir() {
-        return ensureWritableDir(new File(Environment.getExternalStorageDirectory(), "amap_log"));
+        return ensureWritableDir(new File(Environment.getExternalStorageDirectory(), PUBLIC_LOG_DIR));
     }
 
     private boolean hasPermission(String permission) {
@@ -1504,9 +1509,9 @@ public class MainActivity extends Activity {
 
     private String storagePermissionSummary() {
         if (canWritePublicLogDir()) {
-            return "/sdcard/amap_log 可写，保存日志会优先使用该目录";
+            return "/sdcard/" + PUBLIC_LOG_DIR + " 可写，保存日志会优先使用该目录";
         }
-        return "/sdcard/amap_log 不可写，保存日志会自动回退到应用私有目录";
+        return "/sdcard/" + PUBLIC_LOG_DIR + " 不可写，保存日志会自动回退到应用私有目录";
     }
 
     private void copyLogText(String text) {
@@ -2084,6 +2089,12 @@ public class MainActivity extends Activity {
         sendBroadcast(intent);
     }
 
+    private void notifyClusterPositionChanged() {
+        Intent intent = new Intent(ACTION_CLUSTER_POSITION_CHANGED);
+        intent.setPackage(getPackageName());
+        sendBroadcast(intent);
+    }
+
     private void notifyOverlayContentChanged() {
         Intent intent = new Intent(ACTION_OVERLAY_CONTENT_CHANGED);
         intent.setPackage(getPackageName());
@@ -2179,12 +2190,16 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         int x = Math.max(0, prefs.getInt(KEY_CLUSTER_X, dp(24)) + dx);
         int y = Math.max(0, prefs.getInt(KEY_CLUSTER_Y, dp(120)) + dy);
-        prefs.edit()
+        boolean saved = prefs.edit()
                 .putInt(KEY_CLUSTER_X, x)
                 .putInt(KEY_CLUSTER_Y, y)
-                .apply();
+                .commit();
         startOverlayService();
-        notifyClusterMirrorChanged();
+        if (saved) {
+            notifyClusterPositionChanged();
+        } else {
+            notifyClusterMirrorChanged();
+        }
     }
 
     static int getOverlayScalePercent(android.content.Context context) {
@@ -2445,6 +2460,7 @@ public class MainActivity extends Activity {
             tags.addView(appTag(choice.launchable ? "\u53ef\u6253\u5f00" : "\u65e0\u684c\u9762\u56fe\u6807",
                     choice.launchable ? 0xFFF0FDFA : 0xFFFEF2F2,
                     choice.launchable ? 0xFF0F766E : 0xFFB91C1C));
+            FontManager.applyToViewTree(MainActivity.this, root);
             return root;
         }
 

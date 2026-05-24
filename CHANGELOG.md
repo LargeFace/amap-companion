@@ -11,6 +11,13 @@ update_server/public/CHANGELOG.md
 - 新增“进入软件后自动启动服务”选项；打开 AMap Companion 主界面后会按用户已选择的主屏、副屏或高德广播自动显示设置静默启动伴侣服务。
 - 去除车道信息区域的黑色卡片背景，仅保留车道图形显示。
 - 美化导航和巡航红绿灯样式；巡航方向灯改为更大的圆形箭头徽章加倒计时，导航单灯保留状态灯点加倒计时。
+- 修正调整副屏/仪表百分比大小后，车道信息没有跟随缩放的问题。
+- 新增多红绿灯巡航箭头 DIY：可在 `/sdcard/amap_companion/diy/` 放置 `cruise_arrow_left/right/straight/uturn` 的 PNG、WebP 或 JPG 图片，软件会等比适配到固定箭头位。
+- 统一单红绿灯状态圆点与多红绿灯箭头圆圈的视觉尺寸。
+- 红绿灯胶囊背景改为颜色到透明的渐变，降低透明度时不再残留深色尾巴。
+- 日志公共保存目录调整为 `/sdcard/amap_companion/log`，与 DIY 资源目录统一放在 `/sdcard/amap_companion` 下。
+- 修正副屏位置调整按钮偶发无效的问题；位置按钮现在同步保存坐标并通过专用广播即时移动副屏窗口，不再依赖重建副屏。
+- 新增自定义字体功能：在 `/sdcard/amap_companion/` 或 `/sdcard/amap_companion/diy/` 放置 `font.ttf/font.otf/custom_font.ttf/custom_font.otf` 后，主界面、悬浮窗、副屏和红绿灯会自动使用该字体。
 
 ## 2026-05-23 资源轻量化
 
