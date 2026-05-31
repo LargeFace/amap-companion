@@ -69,6 +69,8 @@ public class OverlayService extends Service {
     private static final long NAVIGATION_ACTIVE_TTL_MS = 12000L;
     private static final long TARGET_BROADCAST_ACTIVE_TTL_MS = 300000L;
     private static final long PANEL_WIDTH_SHRINK_DELAY_MS = 2500L;
+    private static final long FULL_MODE_TURN_MS = 10000L;
+    private static final long FULL_MODE_ETA_MS = 5000L;
     private static final Pattern CAMERA_LIGHT_PATTERN = Pattern.compile(
             "CameraLightInfo\\{([^}]*)\\}");
 
@@ -151,6 +153,18 @@ public class OverlayService extends Service {
     private TextView clusterCompactCruiseDirText;
     private LinearLayout clusterCompactLaneBox;
     private Runnable compactBreathingRunner;
+    // Full dynamic island fields
+    private LinearLayout fullModeTurnInfoCol;
+    private LinearLayout fullModeEtaInfoCol;
+    private LinearLayout fullModeClusterTurnInfoCol;
+    private LinearLayout fullModeClusterEtaInfoCol;
+    private TextView fullModeEtaRemainDist;
+    private TextView fullModeEtaArriveTime;
+    private TextView fullModeClusterEtaRemainDist;
+    private TextView fullModeClusterEtaArriveTime;
+    private Runnable fullModeAlternator;
+    private boolean fullModeShowEta = false;
+    private float fullModeScale = 2f;
     private final HashMap<Integer, LightState> trafficLights = new HashMap<>();
     private final HashMap<String, Bitmap> diyArrowCache = new HashMap<>();
     private final HashMap<String, Long> diyArrowModified = new HashMap<>();
@@ -170,7 +184,6 @@ public class OverlayService extends Service {
     private String currentRoadName = "";
     private String currentHeadingSummary = "";
     private String currentRoadTypeSummary = "";
-    private long currentHeadingUpdatedAt;
     private String currentTurnLead = "";
     private String currentTurnRoad = "";
     private String currentTurnDistance = "";
@@ -300,6 +313,7 @@ public class OverlayService extends Service {
             } catch (Throwable ignored) {
             }
         }
+        stopFullModeAlternator();
         super.onDestroy();
     }
 
@@ -1169,6 +1183,7 @@ public class OverlayService extends Service {
         ImageView navIcon = new ImageView(context);
         navIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         int navIconSize = scaledDp(28, scale);
+        int fullInfoWidth = scaledDp(56, scale);
         LinearLayout.LayoutParams navIconLp = new LinearLayout.LayoutParams(navIconSize, navIconSize);
         navIconLp.setMargins(scaledDp(10, scale), 0, 0, 0);
         navTurn.addView(navIcon, navIconLp);
@@ -1180,7 +1195,8 @@ public class OverlayService extends Service {
         navDist.setTextColor(primaryTextColor());
         navDist.setTextSize(scaledSp(14f, scale));
         navDist.setTypeface(Typeface.DEFAULT_BOLD);
-        distRoadCol.addView(navDist, new LinearLayout.LayoutParams(-2, -2));
+        navDist.setGravity(Gravity.CENTER);
+        distRoadCol.addView(navDist, new LinearLayout.LayoutParams(-1, -2));
 
         TextView navRoad = new TextView(context);
         navRoad.setTextColor(primaryTextColor());
@@ -1193,11 +1209,11 @@ public class OverlayService extends Service {
         navRoad.setFocusableInTouchMode(true);
         navRoad.setSelected(true);
         navRoad.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams navRoadLp = new LinearLayout.LayoutParams(scaledDp(68, scale), -2);
+        LinearLayout.LayoutParams navRoadLp = new LinearLayout.LayoutParams(-1, -2);
         navRoadLp.setMargins(0, scaledDp(1, scale), 0, 0);
         distRoadCol.addView(navRoad, navRoadLp);
 
-        LinearLayout.LayoutParams distRoadColLp = new LinearLayout.LayoutParams(-2, -2);
+        LinearLayout.LayoutParams distRoadColLp = new LinearLayout.LayoutParams(fullInfoWidth, -2);
         distRoadColLp.setMargins(scaledDp(3, scale), 0, scaledDp(3, scale), 0);
         navTurn.addView(distRoadCol, distRoadColLp);
         content.addView(navTurn, new LinearLayout.LayoutParams(-2, -2));
@@ -1220,7 +1236,7 @@ public class OverlayService extends Service {
         cruiseRoad.setSelected(true);
         cruiseRoad.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams cruiseRoadLp = new LinearLayout.LayoutParams(scaledDp(64, scale), -2);
-        cruiseRoadLp.setMargins(scaledDp(5, scale), 0, 0, 0);
+        cruiseRoadLp.setMargins(scaledDp(7, scale), 0, 0, 0);
         cruiseLeft.addView(cruiseRoad, cruiseRoadLp);
         TextView cruiseDir = new TextView(context);
         cruiseDir.setTextColor(primaryTextColor());
@@ -1339,6 +1355,7 @@ public class OverlayService extends Service {
         ImageView navIcon = new ImageView(context);
         navIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         int navIconSize = scaledDp(28, scale);
+        int fullInfoWidth = scaledDp(56, scale);
         LinearLayout.LayoutParams navIconLp = new LinearLayout.LayoutParams(navIconSize, navIconSize);
         navIconLp.setMargins(scaledDp(10, scale), 0, 0, 0);
         navTurn.addView(navIcon, navIconLp);
@@ -1350,7 +1367,8 @@ public class OverlayService extends Service {
         navDist.setTextColor(primaryTextColor());
         navDist.setTextSize(scaledSp(14f, scale));
         navDist.setTypeface(Typeface.DEFAULT_BOLD);
-        distRoadCol.addView(navDist, new LinearLayout.LayoutParams(-2, -2));
+        navDist.setGravity(Gravity.CENTER);
+        distRoadCol.addView(navDist, new LinearLayout.LayoutParams(-1, -2));
 
         TextView navRoad = new TextView(context);
         navRoad.setTextColor(primaryTextColor());
@@ -1363,11 +1381,11 @@ public class OverlayService extends Service {
         navRoad.setFocusableInTouchMode(true);
         navRoad.setSelected(true);
         navRoad.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams navRoadLp = new LinearLayout.LayoutParams(scaledDp(68, scale), -2);
+        LinearLayout.LayoutParams navRoadLp = new LinearLayout.LayoutParams(-1, -2);
         navRoadLp.setMargins(0, scaledDp(1, scale), 0, 0);
         distRoadCol.addView(navRoad, navRoadLp);
 
-        LinearLayout.LayoutParams distRoadColLp = new LinearLayout.LayoutParams(-2, -2);
+        LinearLayout.LayoutParams distRoadColLp = new LinearLayout.LayoutParams(fullInfoWidth, -2);
         distRoadColLp.setMargins(scaledDp(3, scale), 0, scaledDp(3, scale), 0);
         navTurn.addView(distRoadCol, distRoadColLp);
         content.addView(navTurn, new LinearLayout.LayoutParams(-2, -2));
@@ -1389,7 +1407,7 @@ public class OverlayService extends Service {
         cruiseRoad.setSelected(true);
         cruiseRoad.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams cruiseRoadLp = new LinearLayout.LayoutParams(scaledDp(64, scale), -2);
-        cruiseRoadLp.setMargins(scaledDp(5, scale), 0, 0, 0);
+        cruiseRoadLp.setMargins(scaledDp(7, scale), 0, 0, 0);
         cruiseLeft.addView(cruiseRoad, cruiseRoadLp);
         TextView cruiseDir = new TextView(context);
         cruiseDir.setTextColor(primaryTextColor());
@@ -1475,6 +1493,410 @@ public class OverlayService extends Service {
         return root;
     }
 
+    private LinearLayout buildDynamicIslandFullPanel(Context context, float scale, boolean cluster) {
+        if (cluster) {
+            return buildDynamicIslandFullClusterPanel(context, scale);
+        }
+        fullModeScale = scale;
+        int fullInfoWidth = scaledDp(56, scale);
+
+        LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackground(createDynamicIslandBackground(scale));
+
+        // Content row
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.HORIZONTAL);
+        content.setGravity(Gravity.CENTER_VERTICAL);
+        content.setPadding(scaledDp(6, scale), scaledDp(3, scale), scaledDp(6, scale), scaledDp(3, scale));
+        content.setMinimumHeight(scaledDp(42, scale));
+
+        // Mode tag (hidden)
+        TextView mode = new TextView(context);
+        mode.setVisibility(View.GONE);
+        content.addView(mode, new LinearLayout.LayoutParams(0, 0));
+
+        // --- Nav left section (direction + distance + road name + ETA info) ---
+        LinearLayout navTurn = new LinearLayout(context);
+        navTurn.setOrientation(LinearLayout.HORIZONTAL);
+        navTurn.setGravity(Gravity.CENTER_VERTICAL);
+        navTurn.setVisibility(View.GONE);
+
+        ImageView navIcon = new ImageView(context);
+        navIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        int navIconSize = scaledDp(28, scale);
+        LinearLayout.LayoutParams navIconLp = new LinearLayout.LayoutParams(navIconSize, navIconSize);
+        navIconLp.setMargins(scaledDp(10, scale), 0, 0, 0);
+        navTurn.addView(navIcon, navIconLp);
+
+        // Turn info column (distance + road name)
+        LinearLayout distRoadCol = new LinearLayout(context);
+        distRoadCol.setOrientation(LinearLayout.VERTICAL);
+        distRoadCol.setGravity(Gravity.CENTER);
+        TextView navDist = new TextView(context);
+        navDist.setTextColor(primaryTextColor());
+        navDist.setTextSize(scaledSp(14f, scale));
+        navDist.setTypeface(Typeface.DEFAULT_BOLD);
+        navDist.setGravity(Gravity.CENTER);
+        distRoadCol.addView(navDist, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView navRoad = new TextView(context);
+        navRoad.setTextColor(primaryTextColor());
+        navRoad.setTextSize(scaledSp(10f, scale));
+        navRoad.setSingleLine(true);
+        navRoad.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+        navRoad.setMarqueeRepeatLimit(-1);
+        navRoad.setHorizontallyScrolling(true);
+        navRoad.setFocusable(true);
+        navRoad.setFocusableInTouchMode(true);
+        navRoad.setSelected(true);
+        navRoad.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams navRoadLp = new LinearLayout.LayoutParams(-1, -2);
+        navRoadLp.setMargins(0, scaledDp(1, scale), 0, 0);
+        distRoadCol.addView(navRoad, navRoadLp);
+
+        LinearLayout.LayoutParams distRoadColLp = new LinearLayout.LayoutParams(fullInfoWidth, -2);
+        distRoadColLp.setMargins(scaledDp(3, scale), 0, scaledDp(3, scale), 0);
+        navTurn.addView(distRoadCol, distRoadColLp);
+
+        // ETA info column (remaining distance + arrival time)
+        LinearLayout etaInfoCol = new LinearLayout(context);
+        etaInfoCol.setOrientation(LinearLayout.VERTICAL);
+        etaInfoCol.setGravity(Gravity.CENTER);
+        etaInfoCol.setVisibility(View.GONE);
+
+        TextView etaRemainDist = new TextView(context);
+        etaRemainDist.setTextColor(primaryTextColor());
+        etaRemainDist.setTextSize(scaledSp(14f, scale));
+        etaRemainDist.setTypeface(Typeface.DEFAULT_BOLD);
+        etaRemainDist.setGravity(Gravity.CENTER);
+        etaInfoCol.addView(etaRemainDist, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView etaArriveTime = new TextView(context);
+        etaArriveTime.setTextColor(primaryTextColor());
+        etaArriveTime.setTextSize(scaledSp(10f, scale));
+        etaArriveTime.setTypeface(Typeface.DEFAULT_BOLD);
+        etaArriveTime.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams etaArriveLp = new LinearLayout.LayoutParams(-1, -2);
+        etaArriveLp.setMargins(0, scaledDp(1, scale), 0, 0);
+        etaInfoCol.addView(etaArriveTime, etaArriveLp);
+
+        LinearLayout.LayoutParams etaInfoColLp = new LinearLayout.LayoutParams(fullInfoWidth, -2);
+        etaInfoColLp.setMargins(scaledDp(3, scale), 0, scaledDp(3, scale), 0);
+        navTurn.addView(etaInfoCol, etaInfoColLp);
+
+        content.addView(navTurn, new LinearLayout.LayoutParams(-2, -2));
+
+        // --- Cruise left section (road name + direction) ---
+        LinearLayout cruiseLeft = new LinearLayout(context);
+        cruiseLeft.setOrientation(LinearLayout.VERTICAL);
+        cruiseLeft.setGravity(Gravity.CENTER);
+        cruiseLeft.setVisibility(View.GONE);
+        TextView cruiseRoad = new TextView(context);
+        cruiseRoad.setTextColor(primaryTextColor());
+        cruiseRoad.setTextSize(scaledSp(12f, scale));
+        cruiseRoad.setTypeface(Typeface.DEFAULT_BOLD);
+        cruiseRoad.setSingleLine(true);
+        cruiseRoad.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+        cruiseRoad.setMarqueeRepeatLimit(-1);
+        cruiseRoad.setHorizontallyScrolling(true);
+        cruiseRoad.setFocusable(true);
+        cruiseRoad.setFocusableInTouchMode(true);
+        cruiseRoad.setSelected(true);
+        cruiseRoad.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams cruiseRoadLp = new LinearLayout.LayoutParams(fullInfoWidth, -2);
+        cruiseRoadLp.setMarginStart(scaledDp(2, scale));
+        cruiseLeft.addView(cruiseRoad, cruiseRoadLp);
+        TextView cruiseDir = new TextView(context);
+        cruiseDir.setTextColor(primaryTextColor());
+        cruiseDir.setTextSize(scaledSp(10f, scale));
+        cruiseDir.setTypeface(Typeface.DEFAULT_BOLD);
+        cruiseDir.setSingleLine(true);
+        cruiseDir.setGravity(Gravity.CENTER);
+        cruiseLeft.addView(cruiseDir, new LinearLayout.LayoutParams(-2, -2));
+        LinearLayout.LayoutParams cruiseLeftLp = new LinearLayout.LayoutParams(-2, -2);
+        cruiseLeftLp.setMargins(0, 0, scaledDp(4, scale), 0);
+        content.addView(cruiseLeft, cruiseLeftLp);
+
+        // --- Lane section ---
+        LinearLayout laneBox = new LinearLayout(context);
+        laneBox.setOrientation(LinearLayout.VERTICAL);
+        laneBox.setGravity(Gravity.CENTER_HORIZONTAL);
+        laneBox.setVisibility(View.GONE);
+        LaneBarView lane = new LaneBarView(context);
+        float compactLaneScale = scale;
+        lane.setFrameScaleMultiplier(compactLaneScale);
+        lane.setScaleMultiplier(0.9f);
+        lane.setCustomHeightDp(36);
+        lane.setLaneSpacingDp(2);
+        lane.setShowBackground(false);
+        lane.setShowDividers(false);
+        lane.setCompactSpacing(true);
+        lane.setUseCommonBitmapCrop(true);
+        laneBox.addView(lane, new LinearLayout.LayoutParams(-2, -2));
+        LinearLayout.LayoutParams laneBoxLp = new LinearLayout.LayoutParams(-2, -2);
+        laneBoxLp.setMargins(0, 0, scaledDp(2, scale), 0);
+        content.addView(laneBox, laneBoxLp);
+
+        // --- Light row ---
+        LinearLayout lights = new LinearLayout(context);
+        lights.setOrientation(LinearLayout.HORIZONTAL);
+        lights.setGravity(Gravity.CENTER);
+        lights.setVisibility(View.GONE);
+        content.addView(lights, new LinearLayout.LayoutParams(-2, -2));
+
+        // --- Widget row ---
+        LinearLayout widgetRow = new LinearLayout(context);
+        widgetRow.setOrientation(LinearLayout.HORIZONTAL);
+        widgetRow.setGravity(Gravity.CENTER_VERTICAL);
+        widgetRow.setVisibility(View.GONE);
+        LinearLayout.LayoutParams widgetRowLp = new LinearLayout.LayoutParams(-2, -2);
+        widgetRowLp.setMargins(scaledDp(3, scale), 0, 0, 0);
+        content.addView(widgetRow, widgetRowLp);
+
+        root.addView(content);
+
+        // --- Field assignments ---
+        panel = root;
+        modeText = mode;
+        compactWidgetRow = widgetRow;
+        compactNavTurnRoadText = navRoad;
+        compactCruiseRoadText = cruiseRoad;
+        compactCruiseDirText = cruiseDir;
+        compactLaneBox = laneBox;
+        fullModeTurnInfoCol = distRoadCol;
+        fullModeEtaInfoCol = etaInfoCol;
+        fullModeEtaRemainDist = etaRemainDist;
+        fullModeEtaArriveTime = etaArriveTime;
+
+        navTurnBox = navTurn;
+        navTurnIconView = navIcon;
+        navTurnDistText = navDist;
+        laneSection = laneBox;
+        laneBar = lane;
+        lightRow = lights;
+
+        // Null out unused fields
+        turnCard = null;
+        turnText = null;
+        turnDistanceText = null;
+        turnIconView = null;
+        turnDistBadge = null;
+        turnRowLayout = null;
+        modeRow = null;
+        titleText = null;
+        summaryDivider = null;
+        summaryRow = null;
+        headingInfoText = null;
+        roadInfoText = null;
+        etaText = null;
+        alertCard = null;
+        limitBadgeText = null;
+        alertCaptionText = null;
+        alertText = null;
+        alertRow = null;
+        detailText = null;
+        turnLeadText = null;
+        turnLeadIconView = null;
+
+        applyTextPalette();
+        refreshTurnCard();
+        return root;
+    }
+
+    private LinearLayout buildDynamicIslandFullClusterPanel(Context context, float scale) {
+        int fullInfoWidth = scaledDp(56, scale);
+        LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackground(createDynamicIslandBackground(scale));
+
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.HORIZONTAL);
+        content.setGravity(Gravity.CENTER_VERTICAL);
+        content.setPadding(scaledDp(6, scale), scaledDp(3, scale), scaledDp(6, scale), scaledDp(3, scale));
+        content.setMinimumHeight(scaledDp(42, scale));
+
+        TextView mode = new TextView(context);
+        mode.setVisibility(View.GONE);
+        content.addView(mode, new LinearLayout.LayoutParams(0, 0));
+
+        LinearLayout navTurn = new LinearLayout(context);
+        navTurn.setOrientation(LinearLayout.HORIZONTAL);
+        navTurn.setGravity(Gravity.CENTER_VERTICAL);
+        navTurn.setVisibility(View.GONE);
+
+        ImageView navIcon = new ImageView(context);
+        navIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        int navIconSize = scaledDp(28, scale);
+        LinearLayout.LayoutParams navIconLp = new LinearLayout.LayoutParams(navIconSize, navIconSize);
+        navIconLp.setMargins(scaledDp(10, scale), 0, 0, 0);
+        navTurn.addView(navIcon, navIconLp);
+
+        // Turn info column
+        LinearLayout distRoadCol = new LinearLayout(context);
+        distRoadCol.setOrientation(LinearLayout.VERTICAL);
+        distRoadCol.setGravity(Gravity.CENTER);
+        TextView navDist = new TextView(context);
+        navDist.setTextColor(primaryTextColor());
+        navDist.setTextSize(scaledSp(14f, scale));
+        navDist.setTypeface(Typeface.DEFAULT_BOLD);
+        navDist.setGravity(Gravity.CENTER);
+        distRoadCol.addView(navDist, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView navRoad = new TextView(context);
+        navRoad.setTextColor(primaryTextColor());
+        navRoad.setTextSize(scaledSp(10f, scale));
+        navRoad.setSingleLine(true);
+        navRoad.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+        navRoad.setMarqueeRepeatLimit(-1);
+        navRoad.setHorizontallyScrolling(true);
+        navRoad.setFocusable(true);
+        navRoad.setFocusableInTouchMode(true);
+        navRoad.setSelected(true);
+        navRoad.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams navRoadLp = new LinearLayout.LayoutParams(-1, -2);
+        navRoadLp.setMargins(0, scaledDp(1, scale), 0, 0);
+        distRoadCol.addView(navRoad, navRoadLp);
+
+        LinearLayout.LayoutParams distRoadColLp = new LinearLayout.LayoutParams(fullInfoWidth, -2);
+        distRoadColLp.setMargins(scaledDp(3, scale), 0, scaledDp(3, scale), 0);
+        navTurn.addView(distRoadCol, distRoadColLp);
+
+        // ETA info column
+        LinearLayout etaInfoCol = new LinearLayout(context);
+        etaInfoCol.setOrientation(LinearLayout.VERTICAL);
+        etaInfoCol.setGravity(Gravity.CENTER);
+        etaInfoCol.setVisibility(View.GONE);
+
+        TextView etaRemainDist = new TextView(context);
+        etaRemainDist.setTextColor(primaryTextColor());
+        etaRemainDist.setTextSize(scaledSp(14f, scale));
+        etaRemainDist.setTypeface(Typeface.DEFAULT_BOLD);
+        etaRemainDist.setGravity(Gravity.CENTER);
+        etaInfoCol.addView(etaRemainDist, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView etaArriveTime = new TextView(context);
+        etaArriveTime.setTextColor(primaryTextColor());
+        etaArriveTime.setTextSize(scaledSp(10f, scale));
+        etaArriveTime.setTypeface(Typeface.DEFAULT_BOLD);
+        etaArriveTime.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams etaArriveLp = new LinearLayout.LayoutParams(-1, -2);
+        etaArriveLp.setMargins(0, scaledDp(1, scale), 0, 0);
+        etaInfoCol.addView(etaArriveTime, etaArriveLp);
+
+        LinearLayout.LayoutParams etaInfoColLp = new LinearLayout.LayoutParams(fullInfoWidth, -2);
+        etaInfoColLp.setMargins(scaledDp(3, scale), 0, scaledDp(3, scale), 0);
+        navTurn.addView(etaInfoCol, etaInfoColLp);
+
+        content.addView(navTurn, new LinearLayout.LayoutParams(-2, -2));
+
+        LinearLayout cruiseLeft = new LinearLayout(context);
+        cruiseLeft.setOrientation(LinearLayout.VERTICAL);
+        cruiseLeft.setGravity(Gravity.CENTER);
+        cruiseLeft.setVisibility(View.GONE);
+        TextView cruiseRoad = new TextView(context);
+        cruiseRoad.setTextColor(primaryTextColor());
+        cruiseRoad.setTextSize(scaledSp(12f, scale));
+        cruiseRoad.setTypeface(Typeface.DEFAULT_BOLD);
+        cruiseRoad.setSingleLine(true);
+        cruiseRoad.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+        cruiseRoad.setMarqueeRepeatLimit(-1);
+        cruiseRoad.setHorizontallyScrolling(true);
+        cruiseRoad.setFocusable(true);
+        cruiseRoad.setFocusableInTouchMode(true);
+        cruiseRoad.setSelected(true);
+        cruiseRoad.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams cruiseRoadLp = new LinearLayout.LayoutParams(fullInfoWidth, -2);
+        cruiseRoadLp.setMargins(scaledDp(7, scale), 0, 0, 0);
+        cruiseLeft.addView(cruiseRoad, cruiseRoadLp);
+        TextView cruiseDir = new TextView(context);
+        cruiseDir.setTextColor(primaryTextColor());
+        cruiseDir.setTextSize(scaledSp(10f, scale));
+        cruiseDir.setTypeface(Typeface.DEFAULT_BOLD);
+        cruiseDir.setSingleLine(true);
+        cruiseDir.setGravity(Gravity.CENTER);
+        cruiseLeft.addView(cruiseDir, new LinearLayout.LayoutParams(-2, -2));
+        LinearLayout.LayoutParams cruiseLeftLp = new LinearLayout.LayoutParams(-2, -2);
+        cruiseLeftLp.setMargins(0, 0, scaledDp(4, scale), 0);
+        content.addView(cruiseLeft, cruiseLeftLp);
+
+        LinearLayout laneBox = new LinearLayout(context);
+        laneBox.setOrientation(LinearLayout.VERTICAL);
+        laneBox.setGravity(Gravity.CENTER_HORIZONTAL);
+        laneBox.setVisibility(View.GONE);
+        LaneBarView lane = new LaneBarView(context);
+        lane.setFrameScaleMultiplier(scale);
+        lane.setScaleMultiplier(0.9f);
+        lane.setCustomHeightDp(36);
+        lane.setLaneSpacingDp(2);
+        lane.setShowBackground(false);
+        lane.setShowDividers(false);
+        lane.setCompactSpacing(true);
+        lane.setUseCommonBitmapCrop(true);
+        laneBox.addView(lane, new LinearLayout.LayoutParams(-2, -2));
+        LinearLayout.LayoutParams laneBoxLp = new LinearLayout.LayoutParams(-2, -2);
+        laneBoxLp.setMargins(0, 0, scaledDp(2, scale), 0);
+        content.addView(laneBox, laneBoxLp);
+
+        LinearLayout lights = new LinearLayout(context);
+        lights.setOrientation(LinearLayout.HORIZONTAL);
+        lights.setGravity(Gravity.CENTER);
+        lights.setVisibility(View.GONE);
+        content.addView(lights, new LinearLayout.LayoutParams(-2, -2));
+
+        LinearLayout widgetRow = new LinearLayout(context);
+        widgetRow.setOrientation(LinearLayout.HORIZONTAL);
+        widgetRow.setGravity(Gravity.CENTER_VERTICAL);
+        widgetRow.setVisibility(View.GONE);
+        LinearLayout.LayoutParams widgetRowLp = new LinearLayout.LayoutParams(-2, -2);
+        widgetRowLp.setMargins(scaledDp(3, scale), 0, 0, 0);
+        content.addView(widgetRow, widgetRowLp);
+
+        root.addView(content);
+
+        clusterPanel = root;
+        clusterModeText = mode;
+        clusterCompactWidgetRow = widgetRow;
+        clusterCompactNavTurnRoadText = navRoad;
+        clusterCompactCruiseRoadText = cruiseRoad;
+        clusterCompactCruiseDirText = cruiseDir;
+        clusterCompactLaneBox = laneBox;
+        fullModeClusterTurnInfoCol = distRoadCol;
+        fullModeClusterEtaInfoCol = etaInfoCol;
+        fullModeClusterEtaRemainDist = etaRemainDist;
+        fullModeClusterEtaArriveTime = etaArriveTime;
+        clusterNavTurnBox = navTurn;
+        clusterNavTurnIconView = navIcon;
+        clusterNavTurnDistText = navDist;
+        clusterLaneSection = laneBox;
+        clusterLaneBar = lane;
+        clusterLightRow = lights;
+        clusterTurnCard = null;
+        clusterTurnText = null;
+        clusterTurnDistanceText = null;
+        clusterTurnIconView = null;
+        clusterTurnDistBadge = null;
+        clusterTurnRowLayout = null;
+        clusterModeRow = null;
+        clusterTitleText = null;
+        clusterSummaryDivider = null;
+        clusterSummaryRow = null;
+        clusterHeadingInfoText = null;
+        clusterRoadInfoText = null;
+        clusterEtaText = null;
+        clusterAlertCard = null;
+        clusterLimitBadgeText = null;
+        clusterAlertCaptionText = null;
+        clusterAlertText = null;
+        clusterAlertRow = null;
+        clusterDetailText = null;
+
+        updateFullModeCruiseDirectionText(cruiseDir);
+        applyTextPalette();
+        refreshTurnCard();
+        return root;
+    }
+
     private boolean shouldShowStandbyStatusDetails() {
         if (TextUtils.isEmpty(currentModeLabel)) {
             return false;
@@ -1542,10 +1964,10 @@ public class OverlayService extends Service {
         activeDensity = context.getResources().getDisplayMetrics().density;
         try {
             LinearLayout panel;
-            if (MainActivity.isDynamicIslandCompactUiEnabled(this)) {
+            if (MainActivity.isDynamicIslandFullUiEnabled(this)) {
+                panel = buildDynamicIslandFullPanel(context, scale, cluster);
+            } else if (MainActivity.isDynamicIslandCompactUiEnabled(this)) {
                 panel = buildDynamicIslandCompactPanel(context, scale, cluster);
-            } else if (MainActivity.isDynamicIslandCompactUiEnabled(this) && cluster) {
-                panel = buildDynamicIslandPanel(context, scale, cluster);
             } else if (MainActivity.isDynamicIslandUiEnabled(this)) {
                 panel = buildDynamicIslandPanel(context, scale, cluster);
             } else if (MainActivity.isNewOverlayUiEnabled(this)) {
@@ -1631,6 +2053,10 @@ public class OverlayService extends Service {
             } catch (Throwable ignored) {
             }
         }
+        fullModeClusterTurnInfoCol = null;
+        fullModeClusterEtaInfoCol = null;
+        fullModeClusterEtaRemainDist = null;
+        fullModeClusterEtaArriveTime = null;
         clusterContext = null;
         clusterWindowManager = null;
         clusterParams = null;
@@ -1947,17 +2373,12 @@ public class OverlayService extends Service {
         if (view == null) {
             return;
         }
-        if (TextUtils.isEmpty(currentHeadingSummary)
-                || System.currentTimeMillis() - currentHeadingUpdatedAt > NAVIGATION_ACTIVE_TTL_MS) {
-            view.setVisibility(View.GONE);
-            return;
-        }
         if (!TextUtils.isEmpty(currentHeadingSummary)) {
             view.setText("\u8f66\u5934\uff1a" + currentHeadingSummary);
-            view.setVisibility(View.VISIBLE);
-        } else {
-            view.setVisibility(View.GONE);
+        } else if (TextUtils.isEmpty(view.getText())) {
+            view.setText("\u8f66\u5934\uff1a--");
         }
+        view.setVisibility(View.VISIBLE);
     }
 
     private void updateClusterCompactTurnText() {
@@ -2168,6 +2589,7 @@ public class OverlayService extends Service {
     private void rebuildOverlay() {
         int oldX = params != null ? params.x : rawDp(24);
         int oldY = params != null ? params.y : rawDp(220);
+        stopFullModeAlternator();
         if (windowManager != null && panel != null && panel.getParent() != null) {
             try {
                 windowManager.removeView(panel);
@@ -2175,6 +2597,12 @@ public class OverlayService extends Service {
                 Log.e(TAG, "overlay remove for scale failed", t);
             }
         }
+        fullModeTurnInfoCol = null;
+        fullModeEtaInfoCol = null;
+        fullModeEtaRemainDist = null;
+        fullModeEtaArriveTime = null;
+        fullModeClusterEtaRemainDist = null;
+        fullModeClusterEtaArriveTime = null;
         panel = null;
         resetMainPanelWidthStabilizer();
         modeRow = null;
@@ -2608,6 +3036,10 @@ public class OverlayService extends Service {
             startCompactBreathing();
             updateCompactModeLayout();
         }
+        if (MainActivity.isDynamicIslandFullUiEnabled(this)) {
+            ensureFullModeAlternator();
+            updateFullModeLayout();
+        }
         syncLaneVisibility();
     }
 
@@ -2625,6 +3057,7 @@ public class OverlayService extends Service {
             clusterCompactNavTurnRoadText.setVisibility(View.GONE);
         }
         stopCompactBreathing();
+        stopFullModeAlternator();
         setPairedVisibility(turnCard, clusterTurnCard, false);
         setPairedVisibility(turnRowLayout, clusterTurnRowLayout, false);
         setPairedVisibility(turnText, clusterTurnText, false);
@@ -2702,8 +3135,8 @@ public class OverlayService extends Service {
     private void syncLaneVisibility() {
         boolean turnPriority = (navTurnBox != null && navTurnBox.getVisibility() == View.VISIBLE)
                 || (clusterNavTurnBox != null && clusterNavTurnBox.getVisibility() == View.VISIBLE);
-        // Compact mode: lanes always visible alongside nav turn info
-        if (MainActivity.isDynamicIslandCompactUiEnabled(this)) {
+        // Compact/full mode: lanes always visible alongside nav turn info
+        if (MainActivity.isDynamicIslandCompactUiEnabled(this) || MainActivity.isDynamicIslandFullUiEnabled(this)) {
             turnPriority = false;
         }
         boolean visible = MainActivity.isLaneVisible(this)
@@ -2974,7 +3407,6 @@ public class OverlayService extends Service {
             lastDetailedMode = null;
             currentRoadName = "";
             currentHeadingSummary = "";
-            currentHeadingUpdatedAt = 0L;
             currentRoadTypeSummary = "";
             clearTurnState();
             updateCompactModeLayout();
@@ -2987,7 +3419,6 @@ public class OverlayService extends Service {
             navigationTurnDir = -1;
             currentRoadName = "";
             currentHeadingSummary = "";
-            currentHeadingUpdatedAt = 0L;
             currentRoadTypeSummary = "";
             updateCompactModeLayout();
             if (etaText != null) {
@@ -3029,8 +3460,6 @@ public class OverlayService extends Service {
         } else {
             mode = "\u5df2\u8fde\u63a5";
             currentRoadName = "";
-            currentHeadingSummary = "";
-            currentHeadingUpdatedAt = 0L;
             currentRoadTypeSummary = "";
             clearTurnState();
         }
@@ -3068,7 +3497,7 @@ public class OverlayService extends Service {
     }
 
     private void updateTurnFromExtras(Bundle extras) {
-        boolean compactMode = MainActivity.isDynamicIslandCompactUiEnabled(this);
+        boolean compactMode = MainActivity.isDynamicIslandCompactUiEnabled(this) || MainActivity.isDynamicIslandFullUiEnabled(this);
         if (turnText == null && (compactNavTurnRoadText == null || !compactMode)) {
             return;
         }
@@ -3827,7 +4256,7 @@ public class OverlayService extends Service {
         try {
             boolean showArrowBadge = showDirectionLabel && state.dir >= 0;
 
-            if (MainActivity.isDynamicIslandCompactUiEnabled(this)) {
+            if (MainActivity.isDynamicIslandCompactUiEnabled(this) || MainActivity.isDynamicIslandFullUiEnabled(this)) {
                 return buildCompactLightPill(context, state, showArrowBadge, scale, seconds, oldDensity);
             }
 
@@ -4242,7 +4671,7 @@ public class OverlayService extends Service {
     }
 
     private void updateEtaFromExtras(Bundle extras) {
-        boolean compactMode = MainActivity.isDynamicIslandCompactUiEnabled(this);
+        boolean compactMode = MainActivity.isDynamicIslandCompactUiEnabled(this) || MainActivity.isDynamicIslandFullUiEnabled(this);
         if (etaText == null && !compactMode) {
             return;
         }
@@ -4307,11 +4736,32 @@ public class OverlayService extends Service {
             if (!TextUtils.isEmpty(road) && !roadIsEmptyDestination) {
                 currentRoadName = road;
             }
-            if (!compactMode) {
+            if (!compactMode && !MainActivity.isDynamicIslandFullUiEnabled(this)) {
                 refreshRoadTitle();
                 syncEtaVisibility();
                 if (MainActivity.isEtaVisible(this)) {
                     showAnyPanel();
+                }
+            } else if (MainActivity.isDynamicIslandFullUiEnabled(this)) {
+                // Store ETA info for alternating display
+                int remainSec = intValue(extras, "ROUTE_REMAIN_TIME", -1);
+                if (remainSec <= 0) {
+                    String timeStr = valueString(extras, "ROUTE_REMAIN_TIME_AUTO", "routeRemainTimeAuto", "remainTime");
+                    if (!TextUtils.isEmpty(timeStr)) {
+                        try {
+                            remainSec = Integer.parseInt(timeStr.replaceAll("[^0-9]", ""));
+                        } catch (NumberFormatException ignored) {}
+                    }
+                }
+                updateFullModeEtaInfo(distance, remainSec);
+                if (!TextUtils.isEmpty(road) && !roadIsEmptyDestination) {
+                    if (!inCruiseMode) {
+                        updateCompactMarqueeText(compactNavTurnRoadText, road);
+                        updateCompactMarqueeText(clusterCompactNavTurnRoadText, road);
+                    }
+                    if (compactCruiseRoadText != null && inCruiseMode) {
+                        updateCompactMarqueeText(compactCruiseRoadText, road);
+                    }
                 }
             } else if (!TextUtils.isEmpty(road) && !roadIsEmptyDestination) {
                 if (compactCruiseRoadText != null && inCruiseMode) {
@@ -4328,7 +4778,7 @@ public class OverlayService extends Service {
     }
 
     private void updateAlertDetails(Bundle extras) {
-        boolean compactMode = MainActivity.isDynamicIslandCompactUiEnabled(this);
+        boolean compactMode = MainActivity.isDynamicIslandCompactUiEnabled(this) || MainActivity.isDynamicIslandFullUiEnabled(this);
         if (alertText == null && !compactMode) {
             return;
         }
@@ -4541,10 +4991,14 @@ public class OverlayService extends Service {
         }
         if (direction >= 0) {
             currentHeadingSummary = bearingToCompass(direction);
-            currentHeadingUpdatedAt = System.currentTimeMillis();
         }
-        updateCompactCruiseDirectionText(compactCruiseDirText);
-        updateCompactCruiseDirectionText(clusterCompactCruiseDirText);
+        if (MainActivity.isDynamicIslandFullUiEnabled(this)) {
+            updateFullModeCruiseDirectionText(compactCruiseDirText);
+            updateFullModeCruiseDirectionText(clusterCompactCruiseDirText);
+        } else {
+            updateCompactCruiseDirectionText(compactCruiseDirText);
+            updateCompactCruiseDirectionText(clusterCompactCruiseDirText);
+        }
 
         String province = valueString(extras, "PROVINCE_NAME", "provinceName");
         String city = valueString(extras, "CITY_NAME", "cityName");
@@ -4961,7 +5415,7 @@ public class OverlayService extends Service {
     // --- Compact mode helpers ---
 
     private void updateCompactModeLayout() {
-        if (!MainActivity.isDynamicIslandCompactUiEnabled(this)) {
+        if (!MainActivity.isDynamicIslandCompactUiEnabled(this) && !MainActivity.isDynamicIslandFullUiEnabled(this)) {
             return;
         }
         boolean isNav = MainActivity.isTurnVisible(this) && !inCruiseMode && currentTurnIcon > 0;
@@ -5012,6 +5466,188 @@ public class OverlayService extends Service {
         }
         if (clusterNavTurnIconView != null) {
             clusterNavTurnIconView.setAlpha(1f);
+        }
+    }
+
+    // --- Full dynamic island mode helpers ---
+
+    private void updateFullModeLayout() {
+        if (!MainActivity.isDynamicIslandFullUiEnabled(this)) {
+            return;
+        }
+        boolean isNav = MainActivity.isTurnVisible(this) && !inCruiseMode && currentTurnIcon > 0;
+        boolean isCruise = inCruiseMode;
+
+        // Only set visibility when state changes to avoid flickering
+        if (navTurnBox != null) {
+            int targetVis = isNav ? View.VISIBLE : View.GONE;
+            if (navTurnBox.getVisibility() != targetVis) {
+                navTurnBox.setVisibility(targetVis);
+                // Ensure alternator starts when nav first becomes visible
+                if (isNav) {
+                    ensureFullModeAlternator();
+                }
+            }
+        }
+        if (clusterNavTurnBox != null) {
+            int targetVis = isNav ? View.VISIBLE : View.GONE;
+            if (clusterNavTurnBox.getVisibility() != targetVis) {
+                clusterNavTurnBox.setVisibility(targetVis);
+            }
+        }
+        // Cruise: only set parent visibility on mode change, update text always
+        if (compactCruiseRoadText != null) {
+            View cruiseParent = (View) compactCruiseRoadText.getParent();
+            if (cruiseParent != null) {
+                int targetVis = isCruise ? View.VISIBLE : View.GONE;
+                if (cruiseParent.getVisibility() != targetVis) {
+                    cruiseParent.setVisibility(targetVis);
+                }
+            }
+            if (isCruise) {
+                String road = !TextUtils.isEmpty(currentRoadName) ? currentRoadName : "";
+                if (!TextUtils.isEmpty(road)) {
+                    updateCompactMarqueeText(compactCruiseRoadText, road);
+                }
+                updateFullModeCruiseDirectionText(compactCruiseDirText);
+            }
+        }
+        if (clusterCompactCruiseRoadText != null) {
+            View cruiseParent = (View) clusterCompactCruiseRoadText.getParent();
+            if (cruiseParent != null) {
+                int targetVis = isCruise ? View.VISIBLE : View.GONE;
+                if (cruiseParent.getVisibility() != targetVis) {
+                    cruiseParent.setVisibility(targetVis);
+                }
+            }
+            if (isCruise) {
+                String road = !TextUtils.isEmpty(currentRoadName) ? currentRoadName : "";
+                if (!TextUtils.isEmpty(road)) {
+                    updateCompactMarqueeText(clusterCompactCruiseRoadText, road);
+                }
+                updateFullModeCruiseDirectionText(clusterCompactCruiseDirText);
+            }
+        }
+        if (panel != null) {
+            panel.setMinimumWidth(0);
+        }
+    }
+
+    private void updateFullModeCruiseDirectionText(TextView view) {
+        if (view == null) {
+            return;
+        }
+        if (!TextUtils.isEmpty(currentHeadingSummary)) {
+            view.setText("\u3010 " + currentHeadingSummary + " \u3011");
+        } else if (TextUtils.isEmpty(view.getText())) {
+            view.setText("\u3010 -- \u3011");
+        }
+        if (view.getVisibility() != View.VISIBLE) {
+            view.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void ensureFullModeAlternator() {
+        if (fullModeAlternator != null) {
+            return; // Already running, don't restart
+        }
+        if (!MainActivity.isDynamicIslandFullUiEnabled(this)) {
+            return;
+        }
+        if (navTurnBox == null || navTurnBox.getVisibility() != View.VISIBLE) {
+            return;
+        }
+        startFullModeAlternator();
+    }
+
+    private void startFullModeAlternator() {
+        stopFullModeAlternator();
+        if (!MainActivity.isDynamicIslandFullUiEnabled(this)) {
+            return;
+        }
+        if (navTurnBox == null || navTurnBox.getVisibility() != View.VISIBLE) {
+            return;
+        }
+        fullModeShowEta = false;
+        updateFullModeAlternatingDisplay();
+        fullModeAlternator = new Runnable() {
+            @Override
+            public void run() {
+                fullModeShowEta = !fullModeShowEta;
+                updateFullModeAlternatingDisplay();
+                long delay = fullModeShowEta ? FULL_MODE_ETA_MS : FULL_MODE_TURN_MS;
+                mainHandler.postDelayed(this, delay);
+            }
+        };
+        mainHandler.postDelayed(fullModeAlternator, FULL_MODE_TURN_MS);
+    }
+
+    private void stopFullModeAlternator() {
+        if (fullModeAlternator != null) {
+            mainHandler.removeCallbacks(fullModeAlternator);
+            fullModeAlternator = null;
+        }
+        fullModeShowEta = false;
+    }
+
+    private void updateFullModeAlternatingDisplay() {
+        if (fullModeTurnInfoCol == null || fullModeEtaInfoCol == null) {
+            return;
+        }
+        if (navTurnBox == null || navTurnBox.getVisibility() != View.VISIBLE) {
+            return;
+        }
+
+        // Simple toggle: respect fullModeShowEta state directly
+        fullModeTurnInfoCol.setVisibility(fullModeShowEta ? View.GONE : View.VISIBLE);
+        fullModeEtaInfoCol.setVisibility(fullModeShowEta ? View.VISIBLE : View.GONE);
+
+        // Update cluster too
+        if (fullModeClusterTurnInfoCol != null && fullModeClusterEtaInfoCol != null
+                && clusterNavTurnBox != null && clusterNavTurnBox.getVisibility() == View.VISIBLE) {
+            fullModeClusterTurnInfoCol.setVisibility(fullModeShowEta ? View.GONE : View.VISIBLE);
+            fullModeClusterEtaInfoCol.setVisibility(fullModeShowEta ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private void updateFullModeEtaInfo(String remainDistText, int remainSeconds) {
+        if (!MainActivity.isDynamicIslandFullUiEnabled(this)) {
+            return;
+        }
+        // Only update when valid data exists - don't overwrite with empty
+        boolean hasDist = !TextUtils.isEmpty(remainDistText);
+        boolean hasTime = remainSeconds > 0;
+
+        if (hasDist) {
+            String dist = remainDistText.replace("\u5343\u7c73", "km")
+                    .replace("\u516c\u91cc", "km")
+                    .replace("\u7c73", "m");
+            String text = "\u4f59" + dist;
+            if (fullModeEtaRemainDist != null) {
+                fullModeEtaRemainDist.setText(text);
+            }
+            if (fullModeClusterEtaRemainDist != null) {
+                fullModeClusterEtaRemainDist.setText(text);
+            }
+        }
+        if (hasTime) {
+            long arriveMillis = System.currentTimeMillis() + remainSeconds * 1000L;
+            java.util.Calendar arrive = java.util.Calendar.getInstance();
+            arrive.setTimeInMillis(arriveMillis);
+            int hour = arrive.get(java.util.Calendar.HOUR_OF_DAY);
+            int minute = arrive.get(java.util.Calendar.MINUTE);
+            String text = String.format(java.util.Locale.US, "%d:%02d\u5230\u8fbe", hour, minute);
+            if (fullModeEtaArriveTime != null) {
+                fullModeEtaArriveTime.setText(text);
+            }
+            if (fullModeClusterEtaArriveTime != null) {
+                fullModeClusterEtaArriveTime.setText(text);
+            }
+        }
+        // Ensure alternator is running when ETA data arrives during navigation
+        if (hasDist && !inCruiseMode && currentTurnIcon > 0
+                && navTurnBox != null && navTurnBox.getVisibility() == View.VISIBLE) {
+            ensureFullModeAlternator();
         }
     }
 
