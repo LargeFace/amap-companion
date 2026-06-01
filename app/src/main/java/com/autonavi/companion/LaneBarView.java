@@ -43,6 +43,7 @@ public class LaneBarView extends View {
     private int customHeightDp = -1;
     private boolean hasCommonLaneSourceBounds;
     private boolean useCommonBitmapCrop;
+    private int minCellCount = 3;
 
     public LaneBarView(Context context) {
         super(context);
@@ -148,6 +149,12 @@ public class LaneBarView extends View {
         invalidate();
     }
 
+    public void setMinCellCount(int min) {
+        minCellCount = Math.max(1, min);
+        requestLayout();
+        invalidate();
+    }
+
     public void setFallbackIcon(int icon) {
         setLaneData(new int[]{icon, 15, 15, 15}, new boolean[]{true, true, true, true});
     }
@@ -158,7 +165,7 @@ public class LaneBarView extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int count = Math.max(3, lanes == null ? 4 : lanes.length);
+        int count = Math.max(minCellCount, lanes == null ? 4 : lanes.length);
         int width;
         int height;
         if (useCommonBitmapCrop && customLaneSpacingDp >= 0) {
@@ -219,7 +226,7 @@ public class LaneBarView extends View {
         }
 
         int count = lanes.length;
-        int visualCount = Math.max(3, count);
+        int visualCount = Math.max(minCellCount, count);
         float cell = getWidth() / (float) visualCount;
         float start = (visualCount - count) * cell / 2f;
         float dividerTop = showBackground ? dp(compactSpacing ? 6 : 8) : dp(2);
@@ -271,6 +278,7 @@ public class LaneBarView extends View {
         paint.setPathEffect(null);
         paint.setStyle(Paint.Style.FILL);
     }
+
 
 
 
@@ -442,6 +450,10 @@ public class LaneBarView extends View {
     }
 
     private void drawDirection(Canvas canvas, int direction, float left, float width) {
+        drawDirection(canvas, direction, left, width, paint);
+    }
+
+    private void drawDirection(Canvas canvas, int direction, float left, float width, Paint p) {
         float cx = left + width / 2f;
         float bottom = getHeight() - dp(10);
         float splitY = getHeight() - dp(27);
@@ -453,37 +465,41 @@ public class LaneBarView extends View {
         path.moveTo(cx, bottom);
         if (direction == STRAIGHT) {
             path.lineTo(cx, top + dp(8));
-            canvas.drawPath(path, paint);
-            drawArrowHead(canvas, cx, top + dp(8), 0f, -1f);
+            canvas.drawPath(path, p);
+            drawArrowHead(canvas, cx, top + dp(8), 0f, -1f, p);
         } else if (direction == LEFT) {
             path.lineTo(cx, splitY);
             path.cubicTo(cx, splitY - dp(11), leftX + dp(9), top + dp(13), leftX, top + dp(11));
-            canvas.drawPath(path, paint);
-            drawArrowHead(canvas, leftX, top + dp(11), -1f, -0.10f);
+            canvas.drawPath(path, p);
+            drawArrowHead(canvas, leftX, top + dp(11), -1f, -0.10f, p);
         } else if (direction == RIGHT) {
             path.lineTo(cx, splitY);
             path.cubicTo(cx, splitY - dp(11), rightX - dp(9), top + dp(13), rightX, top + dp(11));
-            canvas.drawPath(path, paint);
-            drawArrowHead(canvas, rightX, top + dp(11), 1f, -0.10f);
+            canvas.drawPath(path, p);
+            drawArrowHead(canvas, rightX, top + dp(11), 1f, -0.10f, p);
         } else if (direction == U_LEFT) {
             path.lineTo(cx, splitY);
             path.cubicTo(cx, top + dp(6), leftX, top + dp(6), leftX, splitY + dp(9));
-            canvas.drawPath(path, paint);
-            drawArrowHead(canvas, leftX, splitY + dp(9), 0f, 1f);
+            canvas.drawPath(path, p);
+            drawArrowHead(canvas, leftX, splitY + dp(9), 0f, 1f, p);
         } else if (direction == U_RIGHT) {
             path.lineTo(cx, splitY);
             path.cubicTo(cx, top + dp(6), rightX, top + dp(6), rightX, splitY + dp(9));
-            canvas.drawPath(path, paint);
-            drawArrowHead(canvas, rightX, splitY + dp(9), 0f, 1f);
+            canvas.drawPath(path, p);
+            drawArrowHead(canvas, rightX, splitY + dp(9), 0f, 1f, p);
         } else {
-            paint.setPathEffect(new DashPathEffect(new float[]{dp(4), dp(4)}, 0));
+            p.setPathEffect(new DashPathEffect(new float[]{dp(4), dp(4)}, 0));
             path.lineTo(cx, top + dp(8));
-            canvas.drawPath(path, paint);
-            paint.setPathEffect(null);
+            canvas.drawPath(path, p);
+            p.setPathEffect(null);
         }
     }
 
     private void drawArrowHead(Canvas canvas, float x, float y, float dx, float dy) {
+        drawArrowHead(canvas, x, y, dx, dy, paint);
+    }
+
+    private void drawArrowHead(Canvas canvas, float x, float y, float dx, float dy, Paint p) {
         float size = dp(7);
         Path arrow = path;
         arrow.reset();
@@ -498,7 +514,7 @@ public class LaneBarView extends View {
             arrow.moveTo(x, y);
             arrow.lineTo(x + size * 0.72f, y - dy * size);
         }
-        canvas.drawPath(arrow, paint);
+        canvas.drawPath(arrow, p);
     }
 
     private LaneIcon iconForLane(int lane) {
