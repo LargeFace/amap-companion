@@ -232,7 +232,8 @@ public class MainActivity extends Activity {
         section.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         TextView body = new TextView(this);
-        body.setText("\u53cd\u9988/\u4ea4\u6d41\u7fa4 QQ\u7fa4\uff1a1106923186");
+        body.setText("\u672c\u8f6f\u4ef6\u4e3a GitHub \u5f00\u6e90\u9879\u76ee\uff0c\u53ef\u514d\u8d39\u4f7f\u7528\u3002\n"
+                + "\u53cd\u9988/\u4ea4\u6d41\u7fa4 QQ\u7fa4\uff1a1106923186");
         body.setTextSize(14f);
         body.setTextColor(0xFF334155);
         body.setTextIsSelectable(true);
