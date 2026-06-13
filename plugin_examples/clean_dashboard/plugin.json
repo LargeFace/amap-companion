@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "example.clean.dashboard",
+  "name": "简洁仪表风格",
+  "versionCode": 2,
+  "versionName": "1.1.0",
+  "developer": {
+    "name": "AMap Companion 示例",
+    "homepage": "https://amap-companion.zuoqirun.top"
+  },
+  "capabilities": ["icons", "ui", "overlayStyle"],
+  "entry": {
+    "icons": "icons/icons.json",
+    "ui": "ui/dashboard.json",
+    "overlayStyle": "ui/dashboard.json"
+  },
+  "minAppVersionCode": 1,
+  "description": "声明式 UI 模板和悬浮窗样式示例，可作为插件开发起点。"
+}

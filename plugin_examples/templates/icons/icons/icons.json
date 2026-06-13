@@ -1,0 +1,10 @@
+{
+  "icons": {
+    "turn_2": "icons/turn_left.png",
+    "turn_3": "icons/turn_right.png",
+    "turn_9": "icons/turn_straight.png",
+    "edog_camera": "icons/edog_camera.png",
+    "edog_limit_speed": "icons/edog_limit_speed.png",
+    "edog_traffic_light": "icons/edog_traffic_light.png"
+  }
+}

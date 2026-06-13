@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "example.font.simhei",
+  "name": "黑体字体示例",
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "developer": {
+    "name": "AMap Companion 示例",
+    "homepage": "https://github.com/zuo-qirun/amap-companion"
+  },
+  "capabilities": ["font"],
+  "entry": {
+    "font": "fonts/main.ttf"
+  },
+  "minAppVersionCode": 1,
+  "description": "使用黑体字体的单能力插件示例，仅用于本地功能测试。"
+}

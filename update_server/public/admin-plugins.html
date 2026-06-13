@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>插件审核 | AMap Companion</title>
+  <style>
+    :root { --ink:#181917; --paper:#eceee8; --panel:#f8f9f5; --line:#b8bdb4; --muted:#686d65; --green:#1f704c; --red:#bc3f32; --amber:#9b6717; --blue:#315f87; }
+    * { box-sizing:border-box; }
+    [hidden] { display:none !important; }
+    body { margin:0; color:var(--ink); background:var(--paper); font-family:"Microsoft YaHei UI","Noto Sans CJK SC",sans-serif; }
+    button,input,textarea,select { font:inherit; }
+    button { cursor:pointer; }
+    .topbar { min-height:58px; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:0 28px; color:#fff; background:var(--ink); }
+    .brand { font-weight:900; }
+    .userbar { display:flex; align-items:center; gap:10px; font-size:13px; }
+    .login { width:min(460px,calc(100% - 32px)); margin:9vh auto; border-top:7px solid var(--ink); background:var(--panel); box-shadow:12px 12px 0 #c8ccc3; }
+    .login-head { padding:24px 26px 18px; border:1px solid var(--ink); border-top:0; }
+    .login h1 { margin:0; font:700 34px/1.1 "STSong","SimSun",serif; }
+    .login p { margin:9px 0 0; color:var(--muted); font-size:13px; line-height:1.6; }
+    .mode-tabs { display:flex; border:1px solid var(--ink); border-top:0; }
+    .mode-tabs button { flex:1; min-height:39px; border:0; border-right:1px solid var(--ink); background:transparent; }
+    .mode-tabs button:last-child { border-right:0; }
+    .mode-tabs button.active { color:#fff; background:var(--ink); }
+    form { display:grid; gap:16px; }
+    .login form { padding:24px 26px 26px; border:1px solid var(--ink); border-top:0; }
+    label { display:grid; gap:7px; font-size:12px; font-weight:800; }
+    input,textarea,select { width:100%; padding:11px 12px; border:1px solid var(--ink); border-radius:0; color:var(--ink); background:#fff; outline:0; }
+    input:focus,textarea:focus,select:focus { box-shadow:3px 3px 0 var(--ink); }
+    textarea { min-height:100px; resize:vertical; }
+    .button { min-height:40px; padding:0 14px; border:1px solid var(--ink); color:#fff; background:var(--ink); font-weight:800; white-space:nowrap; }
+    .button.secondary { color:var(--ink); background:var(--panel); }
+    .button.green { background:var(--green); border-color:var(--green); }
+    .button.red { color:var(--red); background:transparent; border-color:var(--red); }
+    .button:disabled { opacity:.5; cursor:wait; }
+    .error { color:var(--red); font-size:13px; line-height:1.6; }
+    .notice { padding:11px; border-left:4px solid var(--green); background:#e2efe8; font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
+    .summary { display:grid; grid-template-columns:repeat(4,1fr); border-bottom:1px solid var(--ink); background:var(--panel); }
+    .metric { padding:22px 28px; border-right:1px solid var(--line); }
+    .metric:last-child { border-right:0; }
+    .metric strong { display:block; font:700 31px/1 Consolas,monospace; }
+    .metric span { color:var(--muted); font-size:12px; }
+    .controls { position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 28px; border-bottom:1px solid var(--ink); background:rgba(236,238,232,.96); }
+    .tabs,.actions { display:flex; flex-wrap:wrap; gap:0; }
+    .tabs button { min-height:38px; padding:0 14px; border:1px solid var(--ink); border-right:0; background:transparent; }
+    .tabs button:last-child { border-right:1px solid var(--ink); }
+    .tabs button.active { color:#fff; background:var(--ink); }
+    .actions { gap:8px; }
+    .list { width:min(1400px,100%); margin:auto; padding:24px 28px 64px; display:grid; gap:14px; }
+    .submission { display:grid; grid-template-columns:minmax(220px,.72fr) minmax(300px,1.18fr) minmax(250px,.9fr); border:1px solid var(--ink); background:var(--panel); }
+    .submission>section { min-width:0; padding:19px; border-right:1px solid var(--line); }
+    .submission>section:last-child { border-right:0; }
+    .status { display:inline-block; margin-bottom:11px; padding:4px 7px; color:#fff; background:var(--amber); font-size:11px; font-weight:800; }
+    .status.approved { background:var(--green); } .status.rejected,.status.scan_failed { background:var(--red); } .status.blocked { background:var(--ink); } .status.scanning { background:var(--blue); }
+    h2 { margin:0 0 8px; font:700 22px/1.2 "STSong","SimSun",serif; overflow-wrap:anywhere; }
+    dl { margin:0; display:grid; grid-template-columns:88px minmax(0,1fr); font-size:12px; }
+    dt,dd { margin:0; padding:7px 0; border-bottom:1px solid #d9ddd5; overflow-wrap:anywhere; }
+    dt { color:var(--muted); } .mono { font-family:Consolas,monospace; }
+    .caps { display:flex; flex-wrap:wrap; gap:5px; margin-top:13px; }
+    .cap { padding:3px 6px; border:1px solid var(--line); font:11px/1.3 Consolas,monospace; }
+    .card-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:15px; }
+    .card-actions button { min-height:34px; padding:0 11px; font-size:12px; }
+    .empty { padding:65px 20px; color:var(--muted); text-align:center; }
+    dialog { width:min(500px,calc(100% - 30px)); padding:0; border:1px solid var(--ink); border-radius:0; background:var(--panel); }
+    dialog::backdrop { background:rgba(20,21,19,.68); }
+    .dialog-head { padding:18px 20px; border-bottom:1px solid var(--ink); font-weight:900; }
+    .dialog-body { padding:20px; }
+    .dialog-actions { display:flex; justify-content:flex-end; gap:8px; padding:0 20px 20px; }
+    .user-list { display:grid; gap:7px; max-height:190px; overflow:auto; margin-bottom:18px; }
+    .user-row { display:flex; justify-content:space-between; gap:15px; padding:9px; border:1px solid var(--line); font-size:12px; }
+    @media(max-width:900px) { .submission { grid-template-columns:1fr; } .submission>section { border-right:0; border-bottom:1px solid var(--line); } .summary { grid-template-columns:1fr 1fr; } }
+    @media(max-width:640px) { .topbar { align-items:flex-start; flex-direction:column; padding:12px 15px; } .userbar { width:100%; justify-content:flex-end; flex-wrap:wrap; } .controls { padding-left:15px; padding-right:15px; align-items:stretch; flex-direction:column; } .list { padding-left:15px; padding-right:15px; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">AMap Companion / Plugin Review</div>
+    <div class="userbar" id="userbar" hidden>
+      <span id="username"></span>
+      <button class="button secondary" id="manage-users" type="button">管理员账号</button>
+      <button class="button secondary" id="logout" type="button">退出</button>
+    </div>
+  </header>
+
+  <section class="login" id="login-panel">
+    <div class="login-head"><h1>管理员入口</h1><p id="login-description">登录后审核与发布插件。</p></div>
+    <div class="mode-tabs">
+      <button type="button" class="active" data-login-mode="login">登录</button>
+      <button type="button" data-login-mode="setup">首次设置密码</button>
+      <button type="button" data-login-mode="register" id="register-tab" hidden>初始注册</button>
+    </div>
+    <form id="login-form">
+      <label>用户名<input name="username" autocomplete="username" required></label>
+      <label id="setup-token-field" hidden>首次设置码<input name="setupToken" autocomplete="one-time-code"></label>
+      <label>密码<input name="password" type="password" minlength="10" autocomplete="current-password" required></label>
+      <button class="button" id="login-submit" type="submit">登录</button>
+      <div class="error" id="login-error"></div>
+    </form>
+  </section>
+
+  <main id="workspace" hidden>
+    <section class="summary">
+      <div class="metric"><strong id="count-pending">0</strong><span>待审核</span></div>
+      <div class="metric"><strong id="count-approved">0</strong><span>已通过</span></div>
+      <div class="metric"><strong id="count-rejected">0</strong><span>已拒绝 / 扫描失败</span></div>
+      <div class="metric"><strong id="count-blocked">0</strong><span>已屏蔽</span></div>
+    </section>
+    <section class="controls">
+      <div class="tabs">
+        <button class="active" data-filter="pending">待审核</button>
+        <button data-filter="approved">已通过</button>
+        <button data-filter="rejected">已拒绝</button>
+        <button data-filter="blocked">已屏蔽</button>
+      </div>
+      <button class="button secondary" id="refresh">刷新列表</button>
+    </section>
+    <section class="list" id="submission-list"></section>
+  </main>
+
+  <dialog id="reason-dialog">
+    <div class="dialog-head" id="reason-title">审核操作</div>
+    <div class="dialog-body"><label>审核说明<textarea id="reason" maxlength="1000"></textarea></label></div>
+    <div class="dialog-actions"><button class="button secondary" data-close="reason-dialog">取消</button><button class="button" id="confirm-action">确认</button></div>
+  </dialog>
+
+  <dialog id="users-dialog">
+    <div class="dialog-head">管理员账号</div>
+    <div class="dialog-body">
+      <div class="user-list" id="user-list"></div>
+      <form id="user-form">
+        <label>用户名<input name="username" required></label>
+        <label>创建方式
+          <select name="mode" id="user-mode">
+            <option value="setup">仅创建用户名，由对方首次设置密码</option>
+            <option value="password">直接设置用户名和密码</option>
+          </select>
+        </label>
+        <label id="managed-password-field" hidden>初始密码<input name="password" type="password" minlength="10"></label>
+        <div class="notice" id="setup-result" hidden></div>
+        <div class="error" id="user-error"></div>
+        <button class="button" type="submit">创建管理员</button>
+      </form>
+    </div>
+    <div class="dialog-actions"><button class="button secondary" data-close="users-dialog">关闭</button></div>
+  </dialog>
+
+  <script>
+    const state={submissions:[],filter:"pending",loginMode:"login",pendingAction:null};
+    const $=(id)=>document.getElementById(id);
+    const labels={pending:"待审核",approved:"已通过",rejected:"已拒绝",blocked:"已屏蔽",scan_failed:"扫描失败",scanning:"扫描中"};
+    function el(tag,className,text){const n=document.createElement(tag);if(className)n.className=className;if(text!=null)n.textContent=text;return n;}
+    function row(dl,label,value,className=""){dl.append(el("dt","",label),el("dd",className,value||"-"));}
+    async function api(url,options={}){const r=await fetch(url,options);const d=await r.json();if(!r.ok){const e=new Error(d.error||"请求失败");e.status=r.status;throw e;}return d;}
+    async function registrationStatus(){try{const data=await api("/admin/registration-status");$("register-tab").hidden=!data.registrationOpen;}catch{}}
+    function setLoginMode(mode){
+      state.loginMode=mode;
+      document.querySelectorAll("[data-login-mode]").forEach((b)=>b.classList.toggle("active",b.dataset.loginMode===mode));
+      $("setup-token-field").hidden=mode!=="setup";
+      $("login-form").setupToken.required=mode==="setup";
+      $("login-form").password.autocomplete=mode==="login"?"current-password":"new-password";
+      $("login-submit").textContent=mode==="login"?"登录":mode==="setup"?"设置密码并登录":"完成初始注册";
+      $("login-description").textContent=mode==="register"?"用户名和密码必须与服务器 .env 中的初始管理员凭据完全一致。":mode==="setup"?"填写其他管理员交给你的首次设置码。":"登录后审核与发布插件。";
+      $("login-error").textContent="";
+    }
+    function showLogin(error=""){$("login-panel").hidden=false;$("workspace").hidden=true;$("userbar").hidden=true;$("login-error").textContent=error;registrationStatus();}
+    function showWorkspace(user){$("login-panel").hidden=true;$("workspace").hidden=false;$("userbar").hidden=false;$("username").textContent=`${user.username} · ${user.role||"admin"}`;}
+    async function initialize(){try{const me=await api("/admin/me");showWorkspace(me.user);await loadSubmissions();}catch(e){showLogin(e.status===401?"":e.message);}}
+    async function loadSubmissions(){try{const data=await api("/admin/api/plugin-submissions");state.submissions=data.submissions;updateCounts();renderList();}catch(e){if(e.status===401)showLogin();else $("submission-list").replaceChildren(el("div","empty",e.message));}}
+    function updateCounts(){const count=(s)=>state.submissions.filter((i)=>s.includes(i.status)).length;$("count-pending").textContent=count(["pending","scanning"]);$("count-approved").textContent=count(["approved"]);$("count-rejected").textContent=count(["rejected","scan_failed"]);$("count-blocked").textContent=count(["blocked"]);}
+    function matches(item){if(state.filter==="pending")return["pending","scanning"].includes(item.status);if(state.filter==="rejected")return["rejected","scan_failed"].includes(item.status);return item.status===state.filter;}
+    function renderList(){const list=$("submission-list");list.replaceChildren();const items=state.submissions.filter(matches);if(!items.length){list.append(el("div","empty","当前状态下没有提交记录"));return;}items.forEach((item)=>list.append(renderSubmission(item)));}
+    function renderSubmission(item){
+      const article=el("article","submission");
+      const identity=el("section");identity.append(el("span",`status ${item.status}`,labels[item.status]||item.status),el("h2","",item.scan?.name||"未识别插件"),el("div","mono",item.scan?.id||item.id));
+      if(item.scan){const caps=el("div","caps");item.scan.capabilities.forEach((cap)=>caps.append(el("span","cap",cap)));identity.append(caps);}
+      const scan=el("section"),scanData=el("dl");row(scanData,"提交 ID",item.id,"mono");row(scanData,"提交账号",item.ownerUsername||"匿名");row(scanData,"来源",item.sourceType==="upload"?`上传 · ${item.sourceName||"未命名"}`:"远程下载");row(scanData,"版本",item.scan?`${item.scan.versionName} (${item.scan.versionCode})`:"");row(scanData,"开发者",item.developerName);row(scanData,"提交时间",new Date(item.createdAt).toLocaleString());scan.append(scanData);if(item.error)scan.append(el("div","error",item.error));
+      const source=el("section"),sourceData=el("dl");row(sourceData,"项目地址",item.projectUrl,"mono");row(sourceData,"主页",item.homepage,"mono");row(sourceData,"备注",item.notes);if(item.review)row(sourceData,"审核记录",`${item.review.reviewer} · ${item.review.reason||"无说明"}`);source.append(sourceData);
+      if(item.scan){const actions=el("div","card-actions");actions.append(actionButton("通过","approve",item.id,"button green"),actionButton("拒绝","reject",item.id,"button red"),actionButton("屏蔽","block",item.id,"button"));source.append(actions);}
+      article.append(identity,scan,source);return article;
+    }
+    function actionButton(label,action,id,className){const b=el("button",className,label);b.onclick=()=>openAction(id,action);return b;}
+    function openAction(id,action){state.pendingAction={id,action};$("reason-title").textContent={approve:"通过并发布插件",reject:"拒绝插件提交",block:"屏蔽插件"}[action];$("reason").value="";$("reason-dialog").showModal();}
+    async function loadUsers(){const data=await api("/admin/api/users");const list=$("user-list");list.replaceChildren();data.users.forEach((user)=>{const row=el("div","user-row");row.append(el("span","",`${user.username} · ${user.role}`),el("span","",user.status==="active"?"已启用":"待首次设置"));list.append(row);});}
+
+    document.querySelectorAll("[data-login-mode]").forEach((b)=>b.onclick=()=>setLoginMode(b.dataset.loginMode));
+    $("login-form").onsubmit=async(event)=>{
+      event.preventDefault();$("login-error").textContent="";
+      const loginForm=event.currentTarget;
+      const payload=Object.fromEntries(new FormData(loginForm).entries());
+      const endpoint=state.loginMode==="login"?"/admin/login":state.loginMode==="setup"?"/admin/setup-password":"/admin/register";
+      try{const data=await api(endpoint,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});loginForm.reset();showWorkspace(data.user);await loadSubmissions();}catch(e){$("login-error").textContent=e.message;}
+    };
+    $("logout").onclick=async()=>{await api("/admin/logout",{method:"POST"});showLogin();};
+    $("refresh").onclick=loadSubmissions;
+    document.querySelectorAll("[data-filter]").forEach((b)=>b.onclick=()=>{document.querySelectorAll("[data-filter]").forEach((x)=>x.classList.remove("active"));b.classList.add("active");state.filter=b.dataset.filter;renderList();});
+    document.querySelectorAll("[data-close]").forEach((b)=>b.onclick=()=>$(b.dataset.close).close());
+    $("confirm-action").onclick=async()=>{if(!state.pendingAction)return;const button=$("confirm-action");button.disabled=true;try{const {id,action}=state.pendingAction;await api(`/admin/api/plugin-submissions/${encodeURIComponent(id)}/${action}`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({reason:$("reason").value})});$("reason-dialog").close();await loadSubmissions();}catch(e){$("reason-title").textContent=e.message;}finally{button.disabled=false;}};
+    $("manage-users").onclick=async()=>{$("setup-result").hidden=true;$("user-error").textContent="";await loadUsers();$("users-dialog").showModal();};
+    $("user-mode").onchange=()=>{const direct=$("user-mode").value==="password";$("managed-password-field").hidden=!direct;$("user-form").password.required=direct;};
+    $("user-form").onsubmit=async(event)=>{
+      event.preventDefault();$("user-error").textContent="";$("setup-result").hidden=true;
+      const userForm=event.currentTarget;
+      const values=Object.fromEntries(new FormData(userForm).entries());const payload={username:values.username};if(values.mode==="password")payload.password=values.password;
+      try{const data=await api("/admin/api/users",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});userForm.reset();$("managed-password-field").hidden=true;if(data.user.setupToken){$("setup-result").hidden=false;$("setup-result").textContent=`首次设置码：${data.user.setupToken}。此设置码只显示一次，请通过安全渠道交给 ${data.user.username}。`;}await loadUsers();}catch(e){$("user-error").textContent=e.message;}
+    };
+    initialize();
+  </script>
+</body>
+</html>

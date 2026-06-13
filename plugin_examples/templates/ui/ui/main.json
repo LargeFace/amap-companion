@@ -1,0 +1,90 @@
+{
+  "root": {
+    "type": "column",
+    "padding": 12,
+    "background": "#F21C2228",
+    "strokeColor": "#4DFFFFFF",
+    "strokeWidth": 1,
+    "cornerRadius": 8,
+    "children": [
+      {
+        "type": "row",
+        "gravity": "center_vertical",
+        "children": [
+          {
+            "type": "badge",
+            "bind": "mode",
+            "textSize": 12,
+            "background": "#FF216E4E",
+            "textColor": "#FFFFFFFF"
+          },
+          {
+            "type": "text",
+            "bind": "roadName",
+            "textSize": 15,
+            "bold": true,
+            "singleLine": true,
+            "textColor": "#FFFFFFFF",
+            "marginLeft": 8
+          }
+        ]
+      },
+      {
+        "type": "row",
+        "gravity": "center_vertical",
+        "marginTop": 10,
+        "visibleWhen": "turnIcon",
+        "children": [
+          {
+            "type": "turnIcon",
+            "width": 44,
+            "height": 44,
+            "marginRight": 10
+          },
+          {
+            "type": "column",
+            "children": [
+              {
+                "type": "text",
+                "bind": "turnRoad",
+                "textSize": 16,
+                "bold": true,
+                "textColor": "#FFFFFFFF"
+              },
+              {
+                "type": "text",
+                "bind": "turnDistance",
+                "textSize": 13,
+                "textColor": "#FFB7D8C8"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "row",
+        "gravity": "center_vertical",
+        "marginTop": 10,
+        "children": [
+          {
+            "type": "trafficLights",
+            "marginRight": 8
+          },
+          {
+            "type": "laneBar",
+            "background": true,
+            "dividers": true
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "text": "预计 {eta}",
+        "visibleWhen": "eta",
+        "textSize": 13,
+        "textColor": "#FFD8DED9",
+        "marginTop": 8
+      }
+    ]
+  }
+}

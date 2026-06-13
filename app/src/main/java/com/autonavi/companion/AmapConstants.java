@@ -27,6 +27,8 @@ public final class AmapConstants {
     public static final int NAV_STATE_12          = 12;
     public static final int NAV_STATE_CRUISE      = 24;
     public static final int NAV_STATE_CRUISE_EXIT = 25;
+    public static final int APP_STATE_FOREGROUND  = 3;
+    public static final int APP_STATE_BACKGROUND  = 4;
 
     // ── Traffic light status values ──────────────────────────────────────
     public static final int LIGHT_STATUS_YELLOW_0 = 0;

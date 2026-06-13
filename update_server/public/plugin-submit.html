@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>提交插件 | AMap Companion</title>
+  <style>
+    :root { --ink:#171817; --paper:#f2efe7; --panel:#fffdf8; --line:#bbb7ac; --muted:#69665f; --red:#d84531; --green:#176b4d; --amber:#96600e; }
+    * { box-sizing:border-box; }
+    [hidden] { display:none !important; }
+    body { margin:0; color:var(--ink); background:linear-gradient(rgba(23,24,23,.045) 1px,transparent 1px),var(--paper); background-size:100% 32px; font-family:"Microsoft YaHei UI","Noto Sans CJK SC",sans-serif; }
+    button,input,textarea { font:inherit; }
+    button { cursor:pointer; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:18px; min-height:64px; padding:12px clamp(18px,5vw,64px); border-bottom:1px solid var(--ink); background:rgba(242,239,231,.96); }
+    .brand { font-weight:900; }
+    .account-bar { display:flex; align-items:center; gap:10px; font-size:13px; }
+    .button { min-height:40px; padding:0 16px; border:1px solid var(--ink); border-radius:0; color:#fff; background:var(--ink); font-weight:800; white-space:nowrap; }
+    .button.secondary { color:var(--ink); background:transparent; }
+    .button:hover:not(:disabled) { box-shadow:4px 4px 0 var(--red); transform:translate(-2px,-2px); }
+    .button:disabled { opacity:.55; cursor:wait; }
+    main { width:min(1180px,100%); margin:auto; padding:clamp(38px,6vw,76px) clamp(18px,5vw,64px) 70px; }
+    .intro { display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,.65fr); gap:50px; align-items:end; margin-bottom:42px; }
+    h1 { margin:0; font:700 clamp(42px,7vw,82px)/.98 "STSong","SimSun",serif; letter-spacing:0; }
+    .lede { margin:0; color:var(--muted); line-height:1.8; }
+    .layout { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(310px,.85fr); gap:30px; align-items:start; }
+    .panel { border-top:6px solid var(--ink); background:var(--panel); }
+    .panel-head { padding:18px 20px; border:1px solid var(--ink); border-top:0; }
+    .panel-head h2 { margin:0; font:700 25px/1.2 "STSong","SimSun",serif; }
+    .panel-body { padding:22px 20px; border:1px solid var(--ink); border-top:0; }
+    form { display:grid; gap:18px; }
+    .switch { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--ink); }
+    .switch button { min-height:42px; border:0; border-right:1px solid var(--ink); background:transparent; font-weight:800; }
+    .switch button:last-child { border-right:0; }
+    .switch button.active { color:#fff; background:var(--ink); }
+    .field { display:grid; gap:7px; }
+    label { font-size:12px; font-weight:800; }
+    .required::after { content:" *"; color:var(--red); }
+    input,textarea { width:100%; padding:12px 13px; border:1px solid var(--ink); border-radius:0; color:var(--ink); background:#fff; outline:0; }
+    input:focus,textarea:focus { box-shadow:3px 3px 0 var(--ink); }
+    input[type=file] { min-height:54px; padding:8px; }
+    input[type=file]::file-selector-button { min-height:36px; margin-right:12px; padding:0 14px; border:0; color:#fff; background:var(--ink); font-weight:800; }
+    textarea { min-height:104px; resize:vertical; }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .hint,.muted { color:var(--muted); font-size:12px; line-height:1.6; }
+    .progress { display:grid; gap:8px; padding:13px; border:1px solid var(--ink); }
+    .progress-meta { display:flex; justify-content:space-between; gap:12px; font:12px/1.4 Consolas,sans-serif; }
+    .track { height:11px; border:1px solid var(--ink); }
+    .bar { width:0; height:100%; background:var(--green); transition:width .15s; }
+    .stack { display:grid; gap:20px; }
+    .receipt { min-height:210px; }
+    .status { display:inline-block; margin-bottom:14px; padding:4px 8px; color:#fff; background:var(--amber); font-size:11px; font-weight:800; }
+    .status.approved,.status.pending { background:var(--green); }
+    .status.rejected,.status.blocked,.status.scan_failed { background:var(--red); }
+    dl { margin:0; display:grid; grid-template-columns:90px minmax(0,1fr); font-size:12px; }
+    dt,dd { margin:0; padding:8px 0; border-bottom:1px solid #dedbd2; overflow-wrap:anywhere; }
+    dt { color:var(--muted); }
+    dd { font-family:Consolas,"Microsoft YaHei UI",sans-serif; }
+    .error,.notice { padding:12px; border-left:4px solid var(--red); background:#f8e5e1; font-size:13px; line-height:1.6; }
+    .notice { border-color:var(--green); background:#e5f1eb; }
+    .auth-tabs { display:flex; border-bottom:1px solid var(--ink); }
+    .auth-tabs button { flex:1; min-height:38px; border:0; background:transparent; }
+    .auth-tabs button.active { color:#fff; background:var(--ink); }
+    .history { display:grid; gap:8px; margin-top:14px; }
+    .history-item { width:100%; padding:11px; border:1px solid var(--line); text-align:left; background:#fff; }
+    .history-item strong { display:block; margin-bottom:4px; }
+    code { font-family:Consolas,monospace; overflow-wrap:anywhere; }
+    dialog { width:min(430px,calc(100% - 28px)); padding:0; border:1px solid var(--ink); border-radius:0; background:var(--panel); }
+    dialog::backdrop { background:rgba(20,20,20,.66); }
+    .dialog-head { padding:18px 20px; border-bottom:1px solid var(--ink); font-weight:900; }
+    .dialog-body { padding:20px; }
+    @media (max-width:820px) { .intro,.layout { grid-template-columns:1fr; } .intro { gap:18px; } .grid-2 { grid-template-columns:1fr; } header { align-items:flex-start; flex-direction:column; } .account-bar { width:100%; justify-content:flex-end; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">AMap Companion / Plugin Registry</div>
+    <div class="account-bar">
+      <span id="account-name">匿名提交</span>
+      <button class="button secondary" id="account-button" type="button">开发者登录</button>
+      <button class="button secondary" id="logout-button" type="button" hidden>退出</button>
+    </div>
+  </header>
+  <main>
+    <section class="intro">
+      <h1>提交插件包</h1>
+      <p class="lede">登录不是必需条件。登录后提交会自动进入“我的提交”；匿名提交会生成一组提交 ID 与追踪密钥，请妥善保存。</p>
+    </section>
+    <div class="layout">
+      <section class="panel">
+        <div class="panel-head"><h2>上传并扫描</h2></div>
+        <div class="panel-body">
+          <form id="submission-form">
+            <div class="switch">
+              <button type="button" class="active" data-source="upload">上传文件</button>
+              <button type="button" data-source="url">远程地址</button>
+            </div>
+            <div class="field" id="upload-field">
+              <label class="required" for="pluginFile">插件包</label>
+              <input id="pluginFile" name="pluginFile" type="file" accept=".acplugin,application/zip" required>
+            </div>
+            <div class="field" id="url-field" hidden>
+              <label class="required" for="downloadUrl">插件下载地址</label>
+              <input id="downloadUrl" name="downloadUrl" type="url" placeholder="https://example.com/plugin.acplugin">
+            </div>
+            <div class="field"><label for="projectUrl">开源 / 项目地址</label><input id="projectUrl" name="projectUrl" type="url" placeholder="https://github.com/example/plugin"></div>
+            <div class="grid-2">
+              <div class="field"><label class="required" for="developerName">开发者名称</label><input id="developerName" name="developerName" required maxlength="120"></div>
+              <div class="field"><label for="homepage">主页</label><input id="homepage" name="homepage" type="url" placeholder="https://example.com"></div>
+            </div>
+            <div class="field"><label for="notes">备注</label><textarea id="notes" name="notes" maxlength="2000" placeholder="兼容性、发布信息或需要审核人员注意的事项"></textarea></div>
+            <div><button class="button" id="submit-button" type="submit">提交并扫描</button> <span class="hint" id="source-hint">最大 20MB，服务器统一保存并扫描</span></div>
+            <div class="progress" id="upload-progress" hidden>
+              <div class="progress-meta"><span id="progress-label">准备上传</span><span id="progress-value">0%</span></div>
+              <div class="track"><div class="bar" id="progress-bar"></div></div>
+            </div>
+          </form>
+        </div>
+      </section>
+      <div class="stack">
+        <section class="panel">
+          <div class="panel-head"><h2>提交回执</h2></div>
+          <div class="panel-body receipt" id="result"><p class="muted">提交后显示扫描状态与追踪信息。</p></div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><h2 id="tracking-title">匿名追踪</h2></div>
+          <div class="panel-body">
+            <form id="tracking-form">
+              <div class="field"><label for="tracking-id">提交 ID</label><input id="tracking-id" required></div>
+              <div class="field"><label for="tracking-token">追踪密钥</label><input id="tracking-token" required></div>
+              <button class="button secondary" type="submit">查询审核状态</button>
+            </form>
+            <div class="history" id="submission-history"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <dialog id="account-dialog">
+    <div class="dialog-head">开发者账号</div>
+    <div class="auth-tabs">
+      <button type="button" class="active" data-auth="login">登录</button>
+      <button type="button" data-auth="register">注册</button>
+    </div>
+    <div class="dialog-body">
+      <form id="account-form">
+        <div class="field"><label>用户名<input name="username" autocomplete="username" required></label></div>
+        <div class="field"><label>密码<input name="password" type="password" minlength="10" autocomplete="current-password" required></label></div>
+        <div id="account-error" class="error" hidden></div>
+        <button class="button" id="account-submit" type="submit">登录</button>
+        <button class="button secondary" id="account-cancel" type="button">取消</button>
+      </form>
+    </div>
+  </dialog>
+
+  <script>
+    const state = {source:"upload", authMode:"login", user:null};
+    const $ = (id) => document.getElementById(id);
+    const form = $("submission-form");
+
+    function node(tag, className, text) {
+      const item = document.createElement(tag);
+      if (className) item.className = className;
+      if (text != null) item.textContent = text;
+      return item;
+    }
+    function addRow(dl, label, value) { dl.append(node("dt","",label), node("dd","",value || "-")); }
+    function statusLabel(status) {
+      return {scanning:"扫描中",pending:"待审核",approved:"已通过",rejected:"已拒绝",blocked:"已屏蔽",scan_failed:"扫描失败"}[status] || status;
+    }
+    function renderSubmission(submission, includeToken=false) {
+      const box = document.createDocumentFragment();
+      box.append(node("span",`status ${submission.status}`,statusLabel(submission.status)));
+      const dl = document.createElement("dl");
+      addRow(dl,"提交 ID",submission.id);
+      addRow(dl,"插件",submission.scan?.name);
+      addRow(dl,"版本",submission.scan ? `${submission.scan.versionName} (${submission.scan.versionCode})` : "");
+      addRow(dl,"状态",statusLabel(submission.status));
+      if (includeToken && submission.trackingToken) addRow(dl,"追踪密钥",submission.trackingToken);
+      if (submission.review) addRow(dl,"审核说明",submission.review.reason || "无");
+      box.append(dl);
+      if (submission.error) box.append(node("div","error",submission.error));
+      return box;
+    }
+    async function api(url, options={}) {
+      const response = await fetch(url, options);
+      const data = await response.json();
+      if (!response.ok) { const error = new Error(data.error || "请求失败"); error.status=response.status; throw error; }
+      return data;
+    }
+    function rememberSubmission(submission) {
+      const entries = JSON.parse(localStorage.getItem("amap_plugin_tracking") || "[]");
+      entries.unshift({id:submission.id, token:submission.trackingToken, createdAt:submission.createdAt});
+      localStorage.setItem("amap_plugin_tracking", JSON.stringify(entries.slice(0,10)));
+    }
+    function uploadSubmission(data) {
+      return new Promise((resolve,reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST","/api/plugin-submissions");
+        xhr.timeout=120000;
+        xhr.upload.onprogress=(event)=>{
+          if (!event.lengthComputable) return;
+          const percent=Math.round(event.loaded/event.total*100);
+          $("upload-progress").hidden=false; $("progress-bar").style.width=`${percent}%`;
+          $("progress-label").textContent=percent===100?"上传完成，服务器正在扫描":"正在上传插件包";
+          $("progress-value").textContent=`${percent}%`;
+        };
+        xhr.onload=()=>{
+          let body; try { body=JSON.parse(xhr.responseText); } catch { reject(new Error("服务器返回内容无效")); return; }
+          xhr.status>=200&&xhr.status<300 ? resolve(body) : reject(new Error(body.error || "提交失败"));
+        };
+        xhr.onerror=()=>reject(new Error("上传连接失败"));
+        xhr.ontimeout=()=>reject(new Error("上传或扫描超时"));
+        xhr.send(data);
+      });
+    }
+    async function refreshAccount() {
+      try {
+        const data=await api("/api/developer/me");
+        state.user=data.user;
+        $("account-name").textContent=data.user.username;
+        $("account-button").hidden=true; $("logout-button").hidden=false;
+        $("tracking-title").textContent="我的提交"; $("tracking-form").hidden=true;
+        await loadHistory();
+      } catch {
+        state.user=null;
+        $("account-name").textContent="匿名提交";
+        $("account-button").hidden=false; $("logout-button").hidden=true;
+        $("tracking-title").textContent="匿名追踪"; $("tracking-form").hidden=false;
+        renderLocalHistory();
+      }
+    }
+    async function loadHistory() {
+      const data=await api("/api/developer/submissions");
+      renderHistory(data.submissions);
+    }
+    function renderHistory(items) {
+      const history=$("submission-history"); history.replaceChildren();
+      if (!items.length) { history.append(node("p","muted","暂无提交记录")); return; }
+      items.forEach((item)=>{
+        const button=node("button","history-item");
+        button.type="button";
+        button.append(node("strong","",item.scan?.name || item.id),node("span","muted",`${statusLabel(item.status)} · ${new Date(item.createdAt).toLocaleString()}`));
+        button.onclick=()=>{$("result").replaceChildren(renderSubmission(item));};
+        history.append(button);
+      });
+    }
+    function renderLocalHistory() {
+      const items=JSON.parse(localStorage.getItem("amap_plugin_tracking") || "[]");
+      const history=$("submission-history"); history.replaceChildren();
+      if (!items.length) { history.append(node("p","muted","浏览器中暂无匿名追踪记录")); return; }
+      items.forEach((item)=>{
+        const button=node("button","history-item",item.id); button.type="button";
+        button.onclick=()=>{$("tracking-id").value=item.id; $("tracking-token").value=item.token; $("tracking-form").requestSubmit();};
+        history.append(button);
+      });
+    }
+
+    document.querySelectorAll("[data-source]").forEach((button)=>button.onclick=()=>{
+      state.source=button.dataset.source;
+      document.querySelectorAll("[data-source]").forEach((item)=>item.classList.toggle("active",item===button));
+      const upload=state.source==="upload";
+      $("upload-field").hidden=!upload; $("url-field").hidden=upload;
+      $("pluginFile").required=upload; $("downloadUrl").required=!upload;
+      $("upload-progress").hidden=true;
+    });
+    form.onsubmit=async(event)=>{
+      event.preventDefault();
+      const button=$("submit-button"); button.disabled=true; button.textContent="处理中...";
+      $("result").replaceChildren(node("p","muted","服务器正在保存并扫描插件包，请保持页面打开。"));
+      try {
+        const data=new FormData(form);
+        let response;
+        if (state.source==="upload") response=await uploadSubmission(data);
+        else {
+          data.delete("pluginFile");
+          response=await api("/api/plugin-submissions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(Object.fromEntries(data.entries()))});
+        }
+        rememberSubmission(response.submission);
+        $("result").replaceChildren(renderSubmission(response.submission,true));
+        if (response.submission.status==="pending") form.reset();
+        await refreshAccount();
+      } catch(error) { $("result").replaceChildren(node("div","error",error.message)); }
+      finally { button.disabled=false; button.textContent="提交并扫描"; }
+    };
+    $("tracking-form").onsubmit=async(event)=>{
+      event.preventDefault();
+      try {
+        const data=await api(`/api/plugin-submissions/${encodeURIComponent($("tracking-id").value)}?token=${encodeURIComponent($("tracking-token").value)}`);
+        $("result").replaceChildren(renderSubmission(data.submission));
+      } catch(error) { $("result").replaceChildren(node("div","error",error.message)); }
+    };
+    $("account-button").onclick=()=>{$("account-dialog").showModal();};
+    $("account-cancel").onclick=()=>$("account-dialog").close();
+    document.querySelectorAll("[data-auth]").forEach((button)=>button.onclick=()=>{
+      state.authMode=button.dataset.auth;
+      document.querySelectorAll("[data-auth]").forEach((item)=>item.classList.toggle("active",item===button));
+      $("account-submit").textContent=state.authMode==="login"?"登录":"注册并登录";
+      $("account-form").password.autocomplete=state.authMode==="login"?"current-password":"new-password";
+      $("account-error").hidden=true;
+    });
+    $("account-form").onsubmit=async(event)=>{
+      event.preventDefault();
+      const accountForm=event.currentTarget;
+      const payload=Object.fromEntries(new FormData(accountForm).entries());
+      try {
+        await api(`/api/developer/${state.authMode}`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
+        accountForm.reset(); $("account-dialog").close(); await refreshAccount();
+      } catch(error) { $("account-error").hidden=false; $("account-error").textContent=error.message; }
+    };
+    $("logout-button").onclick=async()=>{await api("/api/developer/logout",{method:"POST"}); await refreshAccount();};
+    refreshAccount();
+  </script>
+</body>
+</html>

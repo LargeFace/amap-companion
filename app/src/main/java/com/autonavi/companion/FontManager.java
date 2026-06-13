@@ -68,6 +68,13 @@ final class FontManager {
     }
 
     private static Typeface customTypeface(Context context) {
+        Typeface pluginTypeface = PluginAssets.activeTypeface(context);
+        if (pluginTypeface != null) {
+            cachedPath = null;
+            cachedModified = 0L;
+            cachedTypeface = null;
+            return pluginTypeface;
+        }
         File file = findFontFile();
         if (file == null) {
             cachedPath = null;

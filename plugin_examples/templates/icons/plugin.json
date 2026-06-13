@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "example.icons.navigation",
+  "name": "导航图标示例",
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "developer": {
+    "name": "AMap Companion 示例",
+    "homepage": "https://github.com/zuo-qirun/amap-companion"
+  },
+  "capabilities": ["icons"],
+  "entry": {
+    "icons": "icons/icons.json"
+  },
+  "minAppVersionCode": 1,
+  "description": "替换左转、右转、直行、摄像头、限速和红绿灯图标。"
+}

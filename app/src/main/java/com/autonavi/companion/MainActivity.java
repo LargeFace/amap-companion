@@ -15,8 +15,10 @@ import android.content.pm.ResolveInfo;
 import android.hardware.display.DisplayManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ClipDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -24,6 +26,7 @@ import android.os.Environment;
 import android.os.Process;
 import android.provider.Settings;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.View;
@@ -49,6 +52,7 @@ import java.util.HashSet;
 import java.util.List;
 
 public class MainActivity extends Activity {
+    private static final String TAG = "AmapCompanion";
     static final String EXTRA_OPEN_SETTINGS = "open_companion_settings";
     private static final String KEY_LAST_DESKTOP_LAUNCH_AT = "last_desktop_launch_at";
     private static final long DOUBLE_DESKTOP_LAUNCH_WINDOW_MS = 30_000L;
@@ -70,6 +74,7 @@ public class MainActivity extends Activity {
     private static final String TARGET_PACKAGE_PREFIX = "com.autonavi.";
     private static final int REQUEST_READ_LOGS_PERMISSION = 7001;
     private static final int REQUEST_STORAGE_PERMISSIONS = 7002;
+    private static final int REQUEST_IMPORT_PLUGIN = 7101;
 
     private TextView targetText;
     private TextView updateText;
@@ -77,10 +82,12 @@ public class MainActivity extends Activity {
     private TextView clusterScaleText;
     private TextView clusterDisplayText;
     private TextView overlayBackgroundOpacityText;
+    private TextView overlayTextColorText;
     private FrameLayout overlayPreviewStage;
     private LinearLayout overlayPreviewPanel;
     private Button overlayTextModeButton;
     private Button overlayUiStyleButton;
+    private LinearLayout overlayStyleChoicesContainer;
     private TextView previewModeText;
     private TextView previewTurnText;
     private LinearLayout previewLightRow;
@@ -88,6 +95,7 @@ public class MainActivity extends Activity {
     private TextView previewEtaText;
     private TextView previewAlertText;
     private TextView previewDetailText;
+    private TextView pluginHubSummaryView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,6 +119,14 @@ public class MainActivity extends Activity {
         super.onNewIntent(intent);
         setIntent(intent);
         redirectDesktopLaunchToTarget(intent);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_IMPORT_PLUGIN && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            installImportedPlugin(data.getData());
+        }
     }
 
     private void autoStartServiceOnAppOpen() {
@@ -193,9 +209,9 @@ public class MainActivity extends Activity {
 
         LinearLayout settings = card(Color.WHITE);
         rightColumn.addView(settings, new LinearLayout.LayoutParams(-1, -2));
+        addOverlayTargetControls(settings);
         addOverlayScaleControls(settings);
         addClusterMirrorControls(settings);
-        addOverlayTargetControls(settings);
         addOverlayContentControls(settings);
         addBehaviorControls(settings);
         addOpenSourceSection(wideLayout ? leftColumn : rightColumn, wideLayout);
@@ -218,8 +234,8 @@ public class MainActivity extends Activity {
                     button("\u9009\u62e9\u4e0b\u8f7d\u6e20\u9053", v -> chooseUpdateChannel(), 0xFF334155),
                     button("\u68c0\u67e5\u66f4\u65b0", v -> checkForUpdates(true), 0xFF059669));
             addButtonPair(parent,
-                    button("\u67e5\u770b/\u4fdd\u5b58\u65e5\u5fd7", v -> showLogcatDialog(), 0xFF4F46E5),
-                    null);
+                    button("\u63d2\u4ef6\u5e02\u573a / \u672c\u5730\u63d2\u4ef6", v -> showPluginHubDialog(), 0xFF7C3AED),
+                    button("\u67e5\u770b/\u4fdd\u5b58\u65e5\u5fd7", v -> showLogcatDialog(), 0xFF4F46E5));
             return;
         }
         parent.addView(button("\u9009\u62e9\u76ee\u6807\u5e94\u7528", v -> chooseTargetApp(), 0xFF2563EB));
@@ -229,6 +245,7 @@ public class MainActivity extends Activity {
         parent.addView(button("\u6253\u5f00\u76ee\u6807\u5e94\u7528", v -> openTargetApp(), 0xFF111827));
         parent.addView(button("\u9009\u62e9\u4e0b\u8f7d\u6e20\u9053", v -> chooseUpdateChannel(), 0xFF334155));
         parent.addView(button("\u68c0\u67e5\u66f4\u65b0", v -> checkForUpdates(true), 0xFF059669));
+        parent.addView(button("\u63d2\u4ef6\u5e02\u573a / \u672c\u5730\u63d2\u4ef6", v -> showPluginHubDialog(), 0xFF7C3AED));
         parent.addView(button("\u67e5\u770b/\u4fdd\u5b58\u65e5\u5fd7", v -> showLogcatDialog(), 0xFF4F46E5));
     }
 
@@ -334,9 +351,8 @@ public class MainActivity extends Activity {
         overlayScaleText.setTextColor(0xFF111827);
         overlayScaleText.setTypeface(Typeface.DEFAULT_BOLD);
         box.addView(overlayScaleText, new LinearLayout.LayoutParams(-1, -2));
-        addOverlayPreview(box);
 
-        SeekBar seekBar = new SeekBar(this);
+        SeekBar seekBar = scaleSeekBar();
         seekBar.setMax(AppPrefs.MAX_OVERLAY_SCALE_PERCENT - AppPrefs.MIN_OVERLAY_SCALE_PERCENT);
         seekBar.setProgress(AppPrefs.getOverlayScalePercent(this) - AppPrefs.MIN_OVERLAY_SCALE_PERCENT);
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -346,6 +362,7 @@ public class MainActivity extends Activity {
                 updateOverlayScaleText(percent);
                 if (fromUser) {
                     saveOverlayScalePercent(percent);
+                    notifyOverlayScaleChanged();
                 }
             }
 
@@ -358,15 +375,60 @@ public class MainActivity extends Activity {
                 int percent = AppPrefs.MIN_OVERLAY_SCALE_PERCENT + bar.getProgress();
                 saveOverlayScalePercent(percent);
                 updateOverlayScaleText(percent);
+                notifyOverlayScaleChanged();
             }
         });
         box.addView(seekBar, new LinearLayout.LayoutParams(-1, -2));
         updateOverlayScaleText(AppPrefs.getOverlayScalePercent(this));
-        box.addView(button("\u5e94\u7528\u5f53\u524d\u5927\u5c0f\u5230\u60ac\u6d6e\u7a97", v -> notifyOverlayScaleChanged(), 0xFF334155));
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, dp(10), 0, 0);
         parent.addView(box, lp);
+    }
+
+    private void addOverlayTargetTiles(LinearLayout parent) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setWeightSum(2f);
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+        rowLp.setMargins(0, dp(10), 0, 0);
+        parent.addView(row, rowLp);
+
+        TextView main = overlayTargetTile("\u4e3b\u5c4f\u60ac\u6d6e\u7a97", AppPrefs.KEY_MAIN_OVERLAY_ENABLED);
+        TextView cluster = overlayTargetTile("\u526f\u5c4f\u60ac\u6d6e\u7a97", AppPrefs.KEY_CLUSTER_MIRROR_ENABLED);
+        LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(0, dp(68), 1f);
+        leftLp.setMargins(0, 0, dp(6), 0);
+        LinearLayout.LayoutParams rightLp = new LinearLayout.LayoutParams(0, dp(68), 1f);
+        rightLp.setMargins(dp(6), 0, 0, 0);
+        row.addView(main, leftLp);
+        row.addView(cluster, rightLp);
+    }
+
+    private TextView overlayTargetTile(String label, String key) {
+        boolean active = AppPrefs.KEY_CLUSTER_MIRROR_ENABLED.equals(key)
+                ? AppPrefs.isClusterMirrorEnabled(this)
+                : AppPrefs.isMainOverlayEnabled(this);
+        TextView tile = optionTile(label, active, 0xFF0891B2, 0xFF2563EB);
+        tile.setOnClickListener(v -> {
+            boolean next = !v.isSelected();
+            v.setSelected(next);
+            if (AppPrefs.KEY_CLUSTER_MIRROR_ENABLED.equals(key)) {
+                saveClusterMirrorEnabled(next);
+                if (next) {
+                    startOverlayService();
+                }
+                notifyClusterMirrorChanged();
+            } else {
+                saveMainOverlayEnabled(next);
+                if (next) {
+                    startOverlayService();
+                }
+                notifyMainOverlayChanged();
+            }
+            styleOptionTile((TextView) v, next, 0xFF0891B2, 0xFF2563EB);
+            stopServiceIfNoVisuals();
+        });
+        return tile;
     }
 
     private void addClusterMirrorControls(LinearLayout parent) {
@@ -394,11 +456,12 @@ public class MainActivity extends Activity {
         clusterScaleText = new TextView(this);
         clusterScaleText.setTextSize(13f);
         clusterScaleText.setTextColor(0xFF334155);
+        clusterScaleText.setTypeface(Typeface.DEFAULT_BOLD);
         LinearLayout.LayoutParams scaleTextLp = new LinearLayout.LayoutParams(-1, -2);
-        scaleTextLp.setMargins(0, dp(8), 0, 0);
+        scaleTextLp.setMargins(0, dp(6), 0, 0);
         box.addView(clusterScaleText, scaleTextLp);
 
-        SeekBar seekBar = new SeekBar(this);
+        SeekBar seekBar = scaleSeekBar();
         seekBar.setMax(AppPrefs.MAX_OVERLAY_SCALE_PERCENT - AppPrefs.MIN_OVERLAY_SCALE_PERCENT);
         seekBar.setProgress(AppPrefs.getClusterScalePercent(this) - AppPrefs.MIN_OVERLAY_SCALE_PERCENT);
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -427,21 +490,21 @@ public class MainActivity extends Activity {
         box.addView(seekBar, new LinearLayout.LayoutParams(-1, -2));
         updateClusterScaleText(AppPrefs.getClusterScalePercent(this));
 
-        LinearLayout upRow = new LinearLayout(this);
-        upRow.setGravity(Gravity.CENTER);
-        upRow.addView(directionButton("\u4e0a", v -> moveClusterBy(0, -dp(16))));
-        box.addView(upRow, new LinearLayout.LayoutParams(-1, -2));
+        ClusterJoystickView joystick = new ClusterJoystickView(this);
+        joystick.setOnMoveListener((dx, dy) -> moveClusterBy(dx, dy));
+        LinearLayout.LayoutParams joystickLp = new LinearLayout.LayoutParams(dp(148), dp(148));
+        joystickLp.gravity = Gravity.CENTER_HORIZONTAL;
+        joystickLp.setMargins(0, dp(12), 0, 0);
+        box.addView(joystick, joystickLp);
 
-        LinearLayout middleRow = new LinearLayout(this);
-        middleRow.setGravity(Gravity.CENTER);
-        middleRow.addView(directionButton("\u5de6", v -> moveClusterBy(-dp(16), 0)));
-        middleRow.addView(directionButton("\u53f3", v -> moveClusterBy(dp(16), 0)));
-        box.addView(middleRow, new LinearLayout.LayoutParams(-1, -2));
-
-        LinearLayout downRow = new LinearLayout(this);
-        downRow.setGravity(Gravity.CENTER);
-        downRow.addView(directionButton("\u4e0b", v -> moveClusterBy(0, dp(16))));
-        box.addView(downRow, new LinearLayout.LayoutParams(-1, -2));
+        TextView joystickLabel = new TextView(this);
+        joystickLabel.setText("\u526f\u5c4f\u60ac\u6d6e\u7a97\u8c03\u8282\u73af");
+        joystickLabel.setTextSize(12f);
+        joystickLabel.setTextColor(0xFF475569);
+        joystickLabel.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams joystickLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        joystickLabelLp.setMargins(0, dp(5), 0, 0);
+        box.addView(joystickLabel, joystickLabelLp);
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, dp(8), 0, 0);
@@ -460,22 +523,8 @@ public class MainActivity extends Activity {
         title.setTypeface(Typeface.DEFAULT_BOLD);
         box.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView hint = new TextView(this);
-        hint.setText("\u624b\u52a8\u542f\u52a8\u548c\u9ad8\u5fb7\u5e7f\u64ad\u81ea\u52a8\u663e\u793a\u65f6\uff0c\u90fd\u4f1a\u6309\u8fd9\u91cc\u7684\u9009\u9879\u663e\u793a\u4e3b\u5c4f\u6216\u526f\u5c4f\u60ac\u6d6e\u7a97\u3002");
-        hint.setTextSize(12f);
-        hint.setTextColor(0xFF64748B);
-        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
-        hintLp.setMargins(0, dp(6), 0, 0);
-        box.addView(hint, hintLp);
-
-        if (isWideLayout()) {
-            addTogglePair(box,
-                    overlayTargetToggle("\u4e3b\u5c4f\u60ac\u6d6e\u7a97", AppPrefs.KEY_MAIN_OVERLAY_ENABLED),
-                    overlayTargetToggle("\u526f\u5c4f\u60ac\u6d6e\u7a97", AppPrefs.KEY_CLUSTER_MIRROR_ENABLED));
-        } else {
-            box.addView(overlayTargetToggle("\u4e3b\u5c4f\u60ac\u6d6e\u7a97", AppPrefs.KEY_MAIN_OVERLAY_ENABLED));
-            box.addView(overlayTargetToggle("\u526f\u5c4f\u60ac\u6d6e\u7a97", AppPrefs.KEY_CLUSTER_MIRROR_ENABLED));
-        }
+        addOverlayTargetTiles(box);
+        addOverlayUiStyleChoices(box);
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, dp(8), 0, 0);
@@ -494,18 +543,10 @@ public class MainActivity extends Activity {
         title.setTypeface(Typeface.DEFAULT_BOLD);
         box.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView hint = new TextView(this);
-        hint.setText("\u4e3b\u60ac\u6d6e\u7a97\u548c\u526f\u5c4f\u955c\u50cf\u4f1a\u540c\u6b65\u4f7f\u7528\u8fd9\u7ec4\u663e\u793a\u8bbe\u7f6e");
-        hint.setTextSize(12f);
-        hint.setTextColor(0xFF64748B);
-        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
-        hintLp.setMargins(0, dp(6), 0, 0);
-        box.addView(hint, hintLp);
-
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams gridLp = new LinearLayout.LayoutParams(-1, -2);
-        gridLp.setMargins(0, dp(6), 0, 0);
+        gridLp.setMargins(0, dp(5), 0, 0);
         box.addView(grid, gridLp);
 
         if (isWideLayout()) {
@@ -516,32 +557,35 @@ public class MainActivity extends Activity {
                     contentToggle("\u7ea2\u7eff\u706f\u5012\u8ba1\u65f6", AppPrefs.KEY_SHOW_LIGHT),
                     contentToggle("\u8f66\u9053\u4fe1\u606f", AppPrefs.KEY_SHOW_LANE));
             addTogglePair(grid,
-                    contentToggle("\u5269\u4f59\u91cc\u7a0b\u4e0e\u76ee\u7684\u5730", AppPrefs.KEY_SHOW_ETA),
-                    contentToggle("\u9650\u901f/\u7535\u5b50\u773c/\u7ea2\u7eff\u706f\u4e2a\u6570", AppPrefs.KEY_SHOW_ALERT));
+                    contentToggle("\u5269\u4f59\u91cc\u7a0b/\u65f6\u95f4/\u5230\u8fbe\u65f6\u95f4", AppPrefs.KEY_SHOW_ETA),
+                    contentToggle("\u76ee\u7684\u5730\u5730\u70b9", AppPrefs.KEY_SHOW_DESTINATION));
+            addTogglePair(grid,
+                    contentToggle("\u9650\u901f/\u7535\u5b50\u773c/\u7ea2\u7eff\u706f\u4e2a\u6570", AppPrefs.KEY_SHOW_ALERT),
+                    contentToggle("\u8def\u51b5\u5149\u67f1\u6761", AppPrefs.KEY_SHOW_TMC_BAR));
             addTogglePair(grid,
                     contentToggle("\u7ecf\u5178UI\u670d\u52a1\u533a\u4fe1\u606f", AppPrefs.KEY_SHOW_SERVICE_AREA),
                     contentToggle("\u8be6\u7ec6\u72b6\u6001", AppPrefs.KEY_SHOW_DETAIL));
+            addOverspeedBehaviorControls(grid);
         } else {
             grid.addView(contentToggle("\u9876\u90e8\u72b6\u6001", AppPrefs.KEY_SHOW_MODE));
             grid.addView(contentToggle("\u8def\u7ebf\u6307\u5f15", AppPrefs.KEY_SHOW_TURN));
             grid.addView(contentToggle("\u7ea2\u7eff\u706f\u5012\u8ba1\u65f6", AppPrefs.KEY_SHOW_LIGHT));
             grid.addView(contentToggle("\u8f66\u9053\u4fe1\u606f", AppPrefs.KEY_SHOW_LANE));
-            grid.addView(contentToggle("\u5269\u4f59\u91cc\u7a0b\u4e0e\u76ee\u7684\u5730", AppPrefs.KEY_SHOW_ETA));
+            grid.addView(contentToggle("\u5269\u4f59\u91cc\u7a0b/\u65f6\u95f4/\u5230\u8fbe\u65f6\u95f4", AppPrefs.KEY_SHOW_ETA));
+            grid.addView(contentToggle("\u76ee\u7684\u5730\u5730\u70b9", AppPrefs.KEY_SHOW_DESTINATION));
             grid.addView(contentToggle("\u9650\u901f/\u7535\u5b50\u773c/\u7ea2\u7eff\u706f\u4e2a\u6570", AppPrefs.KEY_SHOW_ALERT));
+            grid.addView(contentToggle("\u8def\u51b5\u5149\u67f1\u6761", AppPrefs.KEY_SHOW_TMC_BAR));
             grid.addView(contentToggle("\u7ecf\u5178UI\u670d\u52a1\u533a\u4fe1\u606f", AppPrefs.KEY_SHOW_SERVICE_AREA));
             grid.addView(contentToggle("\u8be6\u7ec6\u72b6\u6001", AppPrefs.KEY_SHOW_DETAIL));
+            addOverspeedBehaviorControls(grid);
         }
         addBackgroundOpacityControls(box);
-        overlayUiStyleButton = button(overlayUiStyleButtonText(), v -> chooseOverlayUiStyle(), 0xFF334155);
-        LinearLayout.LayoutParams uiStyleLp = new LinearLayout.LayoutParams(-1, dp(42));
-        uiStyleLp.setMargins(0, dp(8), 0, 0);
-        overlayUiStyleButton.setLayoutParams(uiStyleLp);
-        box.addView(overlayUiStyleButton);
         overlayTextModeButton = button(textModeButtonText(), v -> chooseTextMode(), 0xFF475569);
         LinearLayout.LayoutParams buttonLp = new LinearLayout.LayoutParams(-1, dp(42));
         buttonLp.setMargins(0, dp(8), 0, 0);
         overlayTextModeButton.setLayoutParams(buttonLp);
         box.addView(overlayTextModeButton);
+        addTextColorControls(box);
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, dp(8), 0, 0);
@@ -573,7 +617,7 @@ public class MainActivity extends Activity {
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams gridLp = new LinearLayout.LayoutParams(-1, -2);
-        gridLp.setMargins(0, dp(6), 0, 0);
+        gridLp.setMargins(0, dp(5), 0, 0);
         box.addView(grid, gridLp);
 
         if (isWideLayout()) {
@@ -582,16 +626,10 @@ public class MainActivity extends Activity {
                     behaviorToggle("进入软件后自动启动服务", AppPrefs.KEY_START_SERVICE_ON_APP_OPEN));
             addTogglePair(grid,
                     behaviorToggle("桌面启动时直接进入目标应用", AppPrefs.KEY_LAUNCH_TARGET_FROM_DESKTOP),
-                    null);
-            addTogglePair(grid,
-                    behaviorToggle("高德广播自动显示悬浮窗", AppPrefs.KEY_SHOW_MAIN_WHEN_TARGET_FOREGROUND),
-                    null);
+                    behaviorToggle("高德广播自动显示悬浮窗", AppPrefs.KEY_SHOW_MAIN_WHEN_TARGET_FOREGROUND));
             addTogglePair(grid,
                     behaviorToggle("高德前台隐藏中控悬浮窗", AppPrefs.KEY_HIDE_MAIN_WHEN_TARGET_FOREGROUND),
-                    null);
-            addTogglePair(grid,
-                    behaviorToggle("导航/巡航退出隐藏仪表", AppPrefs.KEY_HIDE_CLUSTER_WHEN_INACTIVE),
-                    null);
+                    behaviorToggle("导航/巡航退出隐藏仪表", AppPrefs.KEY_HIDE_CLUSTER_WHEN_INACTIVE));
         } else {
             grid.addView(behaviorToggle("开机或亮屏自动启动服务", AppPrefs.KEY_AUTO_START_ENABLED));
             grid.addView(behaviorToggle("进入软件后自动启动服务", AppPrefs.KEY_START_SERVICE_ON_APP_OPEN));
@@ -600,9 +638,6 @@ public class MainActivity extends Activity {
             grid.addView(behaviorToggle("高德前台隐藏中控悬浮窗", AppPrefs.KEY_HIDE_MAIN_WHEN_TARGET_FOREGROUND));
             grid.addView(behaviorToggle("导航/巡航退出隐藏仪表", AppPrefs.KEY_HIDE_CLUSTER_WHEN_INACTIVE));
         }
-
-        addOverspeedBehaviorControls(grid);
-
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, dp(8), 0, 0);
         parent.addView(box, lp);
@@ -620,14 +655,65 @@ public class MainActivity extends Activity {
     }
 
     private void addBackgroundOpacityControls(LinearLayout parent) {
+        LinearLayout palette = new LinearLayout(this);
+        palette.setOrientation(LinearLayout.HORIZONTAL);
+        palette.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams paletteLp = new LinearLayout.LayoutParams(-1, -2);
+        paletteLp.setMargins(0, dp(8), 0, 0);
+        parent.addView(palette, paletteLp);
+
+        View defaultSwatch = new View(this);
+        defaultSwatch.setContentDescription("\u9ed8\u8ba4\u4e3b\u80cc\u666f\u8272");
+        LinearLayout.LayoutParams swatchLp = new LinearLayout.LayoutParams(dp(30), dp(30));
+        palette.addView(defaultSwatch, swatchLp);
+        defaultSwatch.setOnClickListener(v -> {
+            saveBackgroundColor(AppPrefs.DEFAULT_BACKGROUND_COLOR);
+            updateDefaultBackgroundSwatch(defaultSwatch);
+            applyOverlayPreviewStyle();
+            notifyOverlayStyleChanged();
+        });
+        updateDefaultBackgroundSwatch(defaultSwatch);
+
+        SeekBar colorSeekBar = compactColorSeekBar();
+        colorSeekBar.setMax(359);
+        colorSeekBar.setProgress(hueForBackgroundColor(AppPrefs.getBackgroundColor(this)));
+        colorSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    saveBackgroundColor(colorForHue(progress));
+                    updateDefaultBackgroundSwatch(defaultSwatch);
+                    applyOverlayPreviewStyle();
+                    notifyOverlayStyleChanged();
+                }
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {
+                saveBackgroundColor(colorForHue(bar.getProgress()));
+                updateDefaultBackgroundSwatch(defaultSwatch);
+                applyOverlayPreviewStyle();
+                notifyOverlayStyleChanged();
+            }
+        });
+        LinearLayout.LayoutParams colorLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        colorLp.setMargins(dp(8), 0, 0, 0);
+        palette.addView(colorSeekBar, colorLp);
+
         overlayBackgroundOpacityText = new TextView(this);
         overlayBackgroundOpacityText.setTextSize(13f);
         overlayBackgroundOpacityText.setTextColor(0xFF334155);
+        overlayBackgroundOpacityText.setTypeface(Typeface.DEFAULT_BOLD);
         LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(-1, -2);
-        textLp.setMargins(0, dp(8), 0, 0);
+        textLp.setMargins(0, dp(4), 0, 0);
         parent.addView(overlayBackgroundOpacityText, textLp);
 
-        SeekBar seekBar = new SeekBar(this);
+        SeekBar seekBar = scaleSeekBar();
+        seekBar.setPadding(dp(8), dp(2), dp(8), dp(8));
+        seekBar.setMinimumHeight(dp(40));
+        seekBar.setMinHeight(dp(40));
         seekBar.setMax(AppPrefs.MAX_BACKGROUND_OPACITY_PERCENT - AppPrefs.MIN_BACKGROUND_OPACITY_PERCENT);
         seekBar.setProgress(AppPrefs.getBackgroundOpacityPercent(this) - AppPrefs.MIN_BACKGROUND_OPACITY_PERCENT);
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -657,6 +743,158 @@ public class MainActivity extends Activity {
         });
         parent.addView(seekBar, new LinearLayout.LayoutParams(-1, -2));
         updateBackgroundOpacityText(AppPrefs.getBackgroundOpacityPercent(this));
+    }
+
+    private void addTextColorControls(LinearLayout parent) {
+        overlayTextColorText = new TextView(this);
+        overlayTextColorText.setTextSize(13f);
+        overlayTextColorText.setTextColor(0xFF111827);
+        overlayTextColorText.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(-1, -2);
+        textLp.setMargins(0, dp(7), 0, 0);
+        parent.addView(overlayTextColorText, textLp);
+
+        SeekBar seekBar = compactColorSeekBar();
+        seekBar.setMax(359);
+        seekBar.setProgress(hueForBackgroundColor(AppPrefs.getTextColor(this)));
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    saveTextColor(colorForTextHue(progress));
+                    updateTextColorText(true);
+                    applyOverlayPreviewStyle();
+                    notifyOverlayStyleChanged();
+                }
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {
+                saveTextColor(colorForTextHue(bar.getProgress()));
+                updateTextColorText(true);
+                applyOverlayPreviewStyle();
+                notifyOverlayStyleChanged();
+            }
+        });
+        parent.addView(seekBar, new LinearLayout.LayoutParams(-1, -2));
+        updateTextColorText(AppPrefs.isCustomTextColorEnabled(this));
+    }
+
+    private void addOverlayUiStyleChoices(LinearLayout parent) {
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        overlayStyleChoicesContainer = list;
+        LinearLayout.LayoutParams listLp = new LinearLayout.LayoutParams(-1, -2);
+        listLp.setMargins(0, dp(10), 0, 0);
+        parent.addView(list, listLp);
+        populateOverlayUiStyleChoices(list);
+    }
+
+    private void populateOverlayUiStyleChoices(LinearLayout list) {
+        list.removeAllViews();
+        ArrayList<OverlayStyleChoice> choices = overlayStyleChoices();
+        for (int i = 0; i < choices.size(); i += 2) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setWeightSum(2f);
+            list.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            addStyleChoice(row, choices.get(i));
+            if (i + 1 < choices.size()) {
+                addStyleChoice(row, choices.get(i + 1));
+            } else {
+                View spacer = new View(this);
+                row.addView(spacer, new LinearLayout.LayoutParams(0, dp(58), 1f));
+            }
+        }
+    }
+
+    private void rebuildOverlayUiStyleChoices() {
+        if (overlayStyleChoicesContainer != null) {
+            populateOverlayUiStyleChoices(overlayStyleChoicesContainer);
+        }
+    }
+
+    private void addStyleChoice(LinearLayout row, OverlayStyleChoice choice) {
+        TextView tile = optionTile(choice.label, choice.id.equals(AppPrefs.getOverlayUiStyle(this)),
+                0xFF4F46E5, 0xFF7C3AED);
+        tile.setTag(choice.id);
+        tile.setOnClickListener(v -> {
+            saveOverlayUiStyle(choice.id);
+            refreshStyleChoices((ViewGroup) row.getParent());
+            applyOverlayPreviewStyle();
+            notifyOverlayStyleChanged();
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(58), 1f);
+        lp.setMargins(dp(2), 0, dp(2), 0);
+        row.addView(tile, lp);
+    }
+
+    private void refreshStyleChoices(ViewGroup list) {
+        String current = AppPrefs.getOverlayUiStyle(this);
+        for (int i = 0; i < list.getChildCount(); i++) {
+            View child = list.getChildAt(i);
+            if (child instanceof ViewGroup) {
+                refreshStyleChoices((ViewGroup) child);
+            } else if (child instanceof TextView && child.getTag() instanceof String) {
+                TextView tile = (TextView) child;
+                styleOptionTile(tile, current.equals(child.getTag()), 0xFF4F46E5, 0xFF7C3AED);
+            }
+        }
+    }
+
+    private void saveBackgroundColor(int color) {
+        getSharedPreferences(AppPrefs.PREFS, MODE_PRIVATE)
+                .edit()
+                .putInt(AppPrefs.KEY_BACKGROUND_COLOR, AppPrefs.normalizeBackgroundColor(color))
+                .apply();
+    }
+
+    private void updateDefaultBackgroundSwatch(View swatch) {
+        int selected = AppPrefs.getBackgroundColor(this);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(dp(8));
+        bg.setColor(AppPrefs.DEFAULT_BACKGROUND_COLOR);
+        bg.setStroke(dp(selected == AppPrefs.DEFAULT_BACKGROUND_COLOR ? 3 : 1),
+                selected == AppPrefs.DEFAULT_BACKGROUND_COLOR ? 0xFF38BDF8 : 0x99CBD5E1);
+        swatch.setBackground(bg);
+    }
+
+    private int colorForHue(int hue) {
+        return Color.HSVToColor(new float[]{Math.max(0, Math.min(359, hue)), 0.62f, 0.34f});
+    }
+
+    private int colorForTextHue(int hue) {
+        return Color.HSVToColor(new float[]{Math.max(0, Math.min(359, hue)), 0.58f, 0.92f});
+    }
+
+    private int hueForBackgroundColor(int color) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(color, hsv);
+        return Math.max(0, Math.min(359, Math.round(hsv[0])));
+    }
+
+    private SeekBar compactColorSeekBar() {
+        SeekBar seekBar = new SeekBar(this);
+        seekBar.setPadding(dp(4), dp(2), dp(4), dp(8));
+        seekBar.setMinimumHeight(dp(40));
+        seekBar.setMinHeight(dp(40));
+        GradientDrawable progress = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xFF571F1F, 0xFF574D1F, 0xFF27571F, 0xFF1F5754, 0xFF1F3057, 0xFF4D1F57, 0xFF571F1F});
+        progress.setCornerRadius(dp(5));
+        progress.setSize(1, dp(10));
+        seekBar.setProgressDrawable(progress);
+        GradientDrawable thumb = new GradientDrawable();
+        thumb.setShape(GradientDrawable.OVAL);
+        thumb.setColor(0xFFF8FAFC);
+        thumb.setSize(dp(24), dp(24));
+        thumb.setStroke(dp(2), 0xFF475569);
+        seekBar.setThumb(thumb);
+        seekBar.setThumbOffset(dp(12));
+        return seekBar;
     }
 
     private void addOverlayPreview(LinearLayout parent) {
@@ -871,10 +1109,10 @@ public class MainActivity extends Activity {
     private LinearLayout card(int color) {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(dp(14), dp(12), dp(14), dp(14));
+        layout.setPadding(dp(14), dp(12), dp(14), dp(12));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(color);
-        bg.setCornerRadius(dp(10));
+        bg.setCornerRadius(dp(12));
         if (color == Color.WHITE) {
             bg.setStroke(dp(1), 0xFFE5E7EB);
         }
@@ -902,12 +1140,85 @@ public class MainActivity extends Activity {
         return b;
     }
 
-    private Button directionButton(String text, android.view.View.OnClickListener listener) {
-        Button b = button(text, listener, 0xFF475569);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(86), dp(42));
-        lp.setMargins(dp(5), dp(6), dp(5), 0);
-        b.setLayoutParams(lp);
-        return b;
+    private TextView optionTile(String text, boolean active, int startColor, int endColor) {
+        TextView tile = new TextView(this);
+        tile.setText(text);
+        tile.setGravity(Gravity.CENTER);
+        tile.setSingleLine(true);
+        tile.setTextSize(15f);
+        tile.setTypeface(Typeface.DEFAULT_BOLD);
+        tile.setMinHeight(0);
+        tile.setIncludeFontPadding(false);
+        tile.setPadding(dp(8), 0, dp(8), 0);
+        styleOptionTile(tile, active, startColor, endColor);
+        return tile;
+    }
+
+    private void styleOptionTile(TextView tile, boolean active, int startColor, int endColor) {
+        tile.setSelected(active);
+        tile.setTextColor(active ? Color.WHITE : 0xFF172033);
+        GradientDrawable bg;
+        if (active) {
+            bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{startColor, endColor});
+            bg.setStroke(dp(2), AppPrefs.withAlpha(0xFFFFFFFF, 72));
+        } else {
+            bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{0xFFFFFFFF, 0xFFF1F5F9});
+            bg.setStroke(dp(1), 0xFFD7DEE8);
+        }
+        bg.setCornerRadius(dp(12));
+        tile.setBackground(bg);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            tile.setElevation(active ? dp(8) : dp(1));
+            tile.setTranslationZ(active ? dp(3) : 0f);
+        }
+    }
+
+    private SeekBar scaleSeekBar() {
+        SeekBar seekBar = new SeekBar(this);
+        seekBar.setPadding(dp(8), dp(2), dp(8), dp(8));
+        seekBar.setMinimumHeight(dp(40));
+        seekBar.setMinHeight(dp(40));
+
+        GradientDrawable track = new GradientDrawable();
+        track.setColor(0xFFE2E8F0);
+        track.setCornerRadius(dp(5));
+        track.setSize(1, dp(10));
+
+        GradientDrawable secondary = new GradientDrawable();
+        secondary.setColor(0xFFC4D1E3);
+        secondary.setCornerRadius(dp(5));
+        secondary.setSize(1, dp(10));
+
+        GradientDrawable progress = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xFF2563EB, 0xFF06B6D4});
+        progress.setCornerRadius(dp(5));
+        progress.setSize(1, dp(10));
+
+        LayerDrawable progressDrawable = new LayerDrawable(new Drawable[]{
+                track,
+                new ClipDrawable(secondary, Gravity.LEFT, ClipDrawable.HORIZONTAL),
+                new ClipDrawable(progress, Gravity.LEFT, ClipDrawable.HORIZONTAL)
+        });
+        progressDrawable.setId(0, android.R.id.background);
+        progressDrawable.setId(1, android.R.id.secondaryProgress);
+        progressDrawable.setId(2, android.R.id.progress);
+        progressDrawable.setLayerInset(0, 0, dp(19), 0, dp(19));
+        progressDrawable.setLayerInset(1, 0, dp(19), 0, dp(19));
+        progressDrawable.setLayerInset(2, 0, dp(19), 0, dp(19));
+        seekBar.setProgressDrawable(progressDrawable);
+
+        GradientDrawable thumb = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFFF8FAFC, 0xFF38BDF8, 0xFF1D4ED8});
+        thumb.setShape(GradientDrawable.OVAL);
+        thumb.setSize(dp(30), dp(30));
+        thumb.setStroke(dp(2), 0xFFE0F2FE);
+        seekBar.setThumb(thumb);
+        seekBar.setThumbOffset(dp(15));
+        return seekBar;
     }
 
     private void addButtonPair(LinearLayout parent, Button left, Button right) {
@@ -1099,6 +1410,347 @@ public class MainActivity extends Activity {
         return label != null && label.contains("\u5730\u56fe");
     }
 
+    private void showPluginHubDialog() {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(8), dp(16), dp(4));
+
+        TextView summary = new TextView(this);
+        summary.setText(pluginEnabledSummary());
+        summary.setTextSize(13f);
+        summary.setTextColor(0xFF334155);
+        summary.setLineSpacing(dp(2), 1.0f);
+        content.addView(summary, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView hint = new TextView(this);
+        hint.setText("插件包为 .acplugin 文件，支持字体、图标资源、全局界面和悬浮窗样式。插件不执行第三方代码；旧 DIY 字体和巡航箭头仍会作为低优先级兼容层生效。");
+        hint.setTextSize(12f);
+        hint.setTextColor(0xFF64748B);
+        hint.setLineSpacing(dp(2), 1.0f);
+        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+        hintLp.setMargins(0, dp(8), 0, 0);
+        content.addView(hint, hintLp);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("插件市场 / 本地插件")
+                .setView(content)
+                .setPositiveButton("插件市场", null)
+                .setNeutralButton("本地插件", null)
+                .setNegativeButton("导入插件", null)
+                .create();
+        pluginHubSummaryView = summary;
+        dialog.setOnDismissListener(d -> {
+            if (pluginHubSummaryView == summary) {
+                pluginHubSummaryView = null;
+            }
+        });
+        dialog.setOnShowListener(d -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> showPluginMarketDialog());
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> showInstalledPluginsDialog());
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(v -> importPluginFromFile());
+        });
+        dialog.show();
+        FontManager.applyToViewTree(this, content);
+    }
+
+    private void refreshPluginHubSummary() {
+        if (pluginHubSummaryView != null) {
+            pluginHubSummaryView.setText(pluginEnabledSummary());
+        }
+    }
+
+    private String pluginEnabledSummary() {
+        return "当前启用\n"
+                + "字体：" + pluginEnabledName(PluginManifest.CAP_FONT) + "\n"
+                + "图标：" + pluginEnabledName(PluginManifest.CAP_ICONS) + "\n"
+                + "全局界面：" + pluginEnabledName(PluginManifest.CAP_UI) + "\n"
+                + "悬浮窗样式：" + overlayStyleDisplayName(AppPrefs.getOverlayUiStyle(this));
+    }
+
+    private String pluginEnabledName(String capability) {
+        String id = PluginManager.getEnabledPluginId(this, capability);
+        if (TextUtils.isEmpty(id)) {
+            return "未启用";
+        }
+        try {
+            PluginManifest manifest = PluginManager.activeManifest(this, capability);
+            return manifest == null ? id + "（不可用）" : manifest.name + " (" + manifest.versionName + ")";
+        } catch (Throwable ignored) {
+            return id;
+        }
+    }
+
+    private void showInstalledPluginsDialog() {
+        ArrayList<PluginManifest> plugins = PluginManager.installedPlugins(this);
+        if (plugins.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("本地插件")
+                    .setMessage("尚未安装插件。可以从插件市场下载，或导入 .acplugin 文件。")
+                    .setPositiveButton("导入插件", (d, w) -> importPluginFromFile())
+                    .setNegativeButton("关闭", null)
+                    .show();
+            return;
+        }
+        String[] labels = new String[plugins.size()];
+        for (int i = 0; i < plugins.size(); i++) {
+            PluginManifest plugin = plugins.get(i);
+            labels[i] = plugin.name + "  " + plugin.versionName + "\n"
+                    + plugin.displayDeveloper() + " · " + plugin.capabilityLabel();
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("本地插件（点击管理/删除）")
+                .setItems(labels, (dialog, which) -> showInstalledPluginActions(plugins.get(which)))
+                .setPositiveButton("导入插件", (d, w) -> importPluginFromFile())
+                .setNegativeButton("关闭", null)
+                .show();
+    }
+
+    private void showInstalledPluginActions(PluginManifest plugin) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(8), dp(16), dp(2));
+
+        TextView meta = new TextView(this);
+        meta.setText(plugin.description + "\n\n开发者：" + plugin.displayDeveloper()
+                + "\n插件 ID：" + plugin.id
+                + "\n能力：" + plugin.capabilityLabel());
+        meta.setTextSize(13f);
+        meta.setTextColor(0xFF334155);
+        meta.setLineSpacing(dp(2), 1.0f);
+        content.addView(meta, new LinearLayout.LayoutParams(-1, -2));
+
+        final AlertDialog[] holder = new AlertDialog[1];
+        if (plugin.hasCapability(PluginManifest.CAP_FONT)) {
+            content.addView(button("启用为字体插件", v -> {
+                enablePlugin(plugin, PluginManifest.CAP_FONT);
+                if (holder[0] != null) holder[0].dismiss();
+            }, 0xFF2563EB));
+        }
+        if (plugin.hasCapability(PluginManifest.CAP_ICONS)) {
+            content.addView(button("启用为图标插件", v -> {
+                enablePlugin(plugin, PluginManifest.CAP_ICONS);
+                if (holder[0] != null) holder[0].dismiss();
+            }, 0xFF0F766E));
+        }
+        if (plugin.hasCapability(PluginManifest.CAP_UI)) {
+            content.addView(button("启用为全局界面插件", v -> {
+                enablePlugin(plugin, PluginManifest.CAP_UI);
+                if (holder[0] != null) holder[0].dismiss();
+            }, 0xFF7C3AED));
+        }
+        if (plugin.hasCapability(PluginManifest.CAP_OVERLAY_STYLE)) {
+            content.addView(button("设为悬浮窗样式", v -> {
+                saveOverlayUiStyle(OverlayUiStyles.pluginStyleId(plugin.id));
+                applyOverlayPreviewStyle();
+                notifyOverlayStyleChanged();
+                refreshPluginHubSummary();
+                Toast.makeText(this, "已设为悬浮窗样式：" + plugin.name, Toast.LENGTH_SHORT).show();
+                if (holder[0] != null) holder[0].dismiss();
+            }, 0xFF9333EA));
+        }
+        content.addView(button("停用该插件的全部分类", v -> {
+            disablePlugin(plugin);
+            if (holder[0] != null) holder[0].dismiss();
+        }, 0xFF475569));
+        content.addView(button("删除插件", v -> {
+            if (holder[0] != null) holder[0].dismiss();
+            confirmDeletePlugin(plugin);
+        }, 0xFFB91C1C));
+
+        FontManager.applyToViewTree(this, content);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(plugin.name)
+                .setView(content)
+                .setNegativeButton("关闭", null)
+                .create();
+        holder[0] = dialog;
+        dialog.show();
+    }
+
+    private void enablePlugin(PluginManifest plugin, String capability) {
+        try {
+            PluginManager.setEnabledPluginId(this, capability, plugin.id);
+            notifyPluginsChanged();
+            refreshPluginHubSummary();
+            String label = PluginManifest.CAP_FONT.equals(capability) ? "字体"
+                    : PluginManifest.CAP_ICONS.equals(capability) ? "图标" : "全局界面";
+            Toast.makeText(this, "已启用" + label + "插件：" + plugin.name, Toast.LENGTH_SHORT).show();
+            if (PluginManifest.CAP_FONT.equals(capability)) {
+                recreate();
+            }
+        } catch (Throwable t) {
+            Toast.makeText(this, "启用插件失败：" + t.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void disablePlugin(PluginManifest plugin) {
+        boolean fontChanged = false;
+        boolean styleChanged = isPluginOverlayStyleSelected(plugin.id);
+        for (String capability : new String[]{PluginManifest.CAP_FONT, PluginManifest.CAP_ICONS, PluginManifest.CAP_UI}) {
+            if (plugin.id.equals(PluginManager.getEnabledPluginId(this, capability))) {
+                PluginManager.setEnabledPluginId(this, capability, "");
+                if (PluginManifest.CAP_FONT.equals(capability)) {
+                    fontChanged = true;
+                }
+            }
+        }
+        if (styleChanged) {
+            saveOverlayUiStyle(OverlayUiStyles.OLD);
+            applyOverlayPreviewStyle();
+            notifyOverlayStyleChanged();
+        }
+        notifyPluginsChanged();
+        refreshPluginHubSummary();
+        Toast.makeText(this, "已停用：" + plugin.name, Toast.LENGTH_SHORT).show();
+        if (fontChanged) {
+            recreate();
+        }
+    }
+
+    private void confirmDeletePlugin(PluginManifest plugin) {
+        new AlertDialog.Builder(this)
+                .setTitle("删除插件")
+                .setMessage("确定删除“" + plugin.name + "”？如果它正在启用，对应分类会自动停用。")
+                .setPositiveButton("删除", (dialog, which) -> {
+                    boolean fontChanged = plugin.id.equals(PluginManager.getEnabledPluginId(this, PluginManifest.CAP_FONT));
+                    boolean styleChanged = isPluginOverlayStyleSelected(plugin.id);
+                    PluginManager.deletePlugin(this, plugin.id);
+                    rebuildOverlayUiStyleChoices();
+                    if (styleChanged) {
+                        applyOverlayPreviewStyle();
+                        notifyOverlayStyleChanged();
+                    }
+                    notifyPluginsChanged();
+                    refreshPluginHubSummary();
+                    Toast.makeText(this, "已删除插件", Toast.LENGTH_SHORT).show();
+                    if (fontChanged) {
+                        recreate();
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void showPluginMarketDialog() {
+        ArrayList<PluginRepository.MarketPlugin> plugins = new ArrayList<>();
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(8), 0, dp(8), 0);
+        TextView hint = new TextView(this);
+        hint.setText("正在加载插件市场…\n" + PluginRepository.marketUrl(this));
+        hint.setTextSize(12f);
+        hint.setTextColor(0xFF64748B);
+        hint.setPadding(dp(16), dp(6), dp(16), dp(10));
+        content.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+        ListView list = new ListView(this);
+        list.setDivider(null);
+        PluginMarketAdapter adapter = new PluginMarketAdapter(plugins);
+        list.setAdapter(adapter);
+        content.addView(list, new LinearLayout.LayoutParams(-1, Math.min(dp(520), getResources().getDisplayMetrics().heightPixels / 2)));
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("插件市场")
+                .setView(content)
+                .setNegativeButton("关闭", null)
+                .create();
+        list.setOnItemClickListener((parent, view, position, id) -> {
+            if (position >= 0 && position < plugins.size()) {
+                confirmInstallMarketPlugin(plugins.get(position));
+            }
+        });
+        dialog.show();
+        new Thread(() -> {
+            try {
+                ArrayList<PluginRepository.MarketPlugin> fetched = PluginRepository.fetchMarket(this);
+                runOnUiThread(() -> {
+                    if (isFinishing() || !dialog.isShowing()) {
+                        return;
+                    }
+                    plugins.clear();
+                    plugins.addAll(fetched);
+                    hint.setText(fetched.isEmpty() ? "市场暂无可用插件。" : "点击插件可下载并安装。");
+                    adapter.notifyDataSetChanged();
+                });
+            } catch (Throwable t) {
+                runOnUiThread(() -> {
+                    if (!isFinishing() && dialog.isShowing()) {
+                        hint.setText("插件市场加载失败：" + t.getMessage());
+                    }
+                });
+            }
+        }, "plugin-market-loader").start();
+    }
+
+    private void confirmInstallMarketPlugin(PluginRepository.MarketPlugin plugin) {
+        new AlertDialog.Builder(this)
+                .setTitle(plugin.name)
+                .setMessage(plugin.description + "\n\n开发者：" + (TextUtils.isEmpty(plugin.developerName) ? "未知开发者" : plugin.developerName)
+                        + "\n能力：" + plugin.capabilitiesLabel
+                        + "\n版本：" + plugin.versionName
+                        + "\n大小：" + formatBytes(plugin.size))
+                .setPositiveButton("安装/更新", (dialog, which) -> installMarketPlugin(plugin))
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void installMarketPlugin(PluginRepository.MarketPlugin plugin) {
+        Toast.makeText(this, "正在下载插件…", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            try {
+                PluginManifest installed = PluginRepository.downloadAndInstall(this, plugin);
+                runOnUiThread(() -> {
+                    rebuildOverlayUiStyleChoices();
+                    Toast.makeText(this, "插件已安装：" + installed.name, Toast.LENGTH_SHORT).show();
+                    showInstalledPluginActions(installed);
+                });
+            } catch (Throwable t) {
+                runOnUiThread(() -> Toast.makeText(this, "安装插件失败：" + t.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }, "plugin-market-installer").start();
+    }
+
+    private void importPluginFromFile() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        try {
+            startActivityForResult(intent, REQUEST_IMPORT_PLUGIN);
+        } catch (Throwable t) {
+            Intent fallback = new Intent(Intent.ACTION_GET_CONTENT);
+            fallback.addCategory(Intent.CATEGORY_OPENABLE);
+            fallback.setType("*/*");
+            startActivityForResult(fallback, REQUEST_IMPORT_PLUGIN);
+        }
+    }
+
+    private void installImportedPlugin(Uri uri) {
+        Toast.makeText(this, "正在导入插件…", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            try {
+                PluginManifest installed = PluginManager.installFromUri(this, uri, false);
+                runOnUiThread(() -> {
+                    rebuildOverlayUiStyleChoices();
+                    Toast.makeText(this, "插件已导入：" + installed.name, Toast.LENGTH_SHORT).show();
+                    showInstalledPluginActions(installed);
+                });
+            } catch (Throwable t) {
+                runOnUiThread(() -> Toast.makeText(this, "导入插件失败：" + t.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }, "plugin-importer").start();
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes <= 0) {
+            return "未知";
+        }
+        if (bytes < 1024) {
+            return bytes + "B";
+        }
+        if (bytes < 1024 * 1024) {
+            return String.format(java.util.Locale.US, "%.1fKB", bytes / 1024f);
+        }
+        return String.format(java.util.Locale.US, "%.1fMB", bytes / 1024f / 1024f);
+    }
+
     private void startOverlayService() {
         if (!Settings.canDrawOverlays(this)) {
             new AlertDialog.Builder(this)
@@ -1119,14 +1771,18 @@ public class MainActivity extends Activity {
 
     static void startOverlayService(Context context) {
         Intent intent = new Intent(context, OverlayService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 Context.class.getMethod("startForegroundService", Intent.class).invoke(context, intent);
-            } catch (Throwable ignored) {
+            } else {
                 context.startService(intent);
             }
-        } else {
-            context.startService(intent);
+        } catch (Throwable foregroundError) {
+            try {
+                context.startService(intent);
+            } catch (Throwable fallbackError) {
+                Log.e(TAG, "start overlay service failed", fallbackError);
+            }
         }
     }
 
@@ -1668,8 +2324,9 @@ public class MainActivity extends Activity {
             saveBehaviorEnabled(key, isChecked);
             if (AppPrefs.KEY_HIDE_MAIN_WHEN_TARGET_FOREGROUND.equals(key)
                     && isChecked && !AppPrefs.hasUsageStatsAccess(this)) {
-                Toast.makeText(this, "请为 AMap Companion 开启使用情况访问权限", Toast.LENGTH_LONG).show();
-                openUsageAccessSettings();
+                Toast.makeText(this,
+                        "将优先使用高德前后台广播；使用情况访问权限仅作为兼容回退",
+                        Toast.LENGTH_LONG).show();
             }
             if (isChecked) {
                 if (AppPrefs.KEY_START_SERVICE_ON_APP_OPEN.equals(key)) {
@@ -1740,16 +2397,20 @@ public class MainActivity extends Activity {
     }
 
     private void updateOverlayPreviewContentVisibility() {
+        updatePreviewEtaText();
         setPreviewVisibility(previewModeText, AppPrefs.isOverlayContentEnabled(this, AppPrefs.KEY_SHOW_MODE));
         setPreviewVisibility(previewTurnText, AppPrefs.isOverlayContentEnabled(this, AppPrefs.KEY_SHOW_TURN));
         setPreviewVisibility(previewLightRow, AppPrefs.isOverlayContentEnabled(this, AppPrefs.KEY_SHOW_LIGHT));
         setPreviewVisibility(previewLaneSection, AppPrefs.isOverlayContentEnabled(this, AppPrefs.KEY_SHOW_LANE));
-        setPreviewVisibility(previewEtaText, AppPrefs.isOverlayContentEnabled(this, AppPrefs.KEY_SHOW_ETA));
+        setPreviewVisibility(previewEtaText,
+                AppPrefs.isOverlayContentEnabled(this, AppPrefs.KEY_SHOW_ETA)
+                        || AppPrefs.shouldShowDestination(this));
         setPreviewVisibility(previewAlertText, AppPrefs.isOverlayContentEnabled(this, AppPrefs.KEY_SHOW_ALERT));
         setPreviewVisibility(previewDetailText, AppPrefs.isOverlayContentEnabled(this, AppPrefs.KEY_SHOW_DETAIL));
     }
 
     private void applyOverlayPreviewStyle() {
+        updateOverlayPreviewContentVisibility();
         applyOverlayPreviewPanelStyle();
         applyOverlayPreviewTextStyle();
         if (overlayUiStyleButton != null) {
@@ -1759,6 +2420,23 @@ public class MainActivity extends Activity {
             overlayTextModeButton.setText(textModeButtonText());
         }
         updateBackgroundOpacityText(AppPrefs.getBackgroundOpacityPercent(this));
+    }
+
+    private void updatePreviewEtaText() {
+        if (previewEtaText == null) {
+            return;
+        }
+        StringBuilder text = new StringBuilder();
+        if (AppPrefs.isOverlayContentEnabled(this, AppPrefs.KEY_SHOW_ETA)) {
+            text.append("5.3\u516c\u91cc \u00b7 10\u5206\u949f\n\u9884\u8ba105:42\u5230\u8fbe");
+        }
+        if (AppPrefs.shouldShowDestination(this)) {
+            if (text.length() > 0) {
+                text.append('\n');
+            }
+            text.append("\u76ee\u7684\u5730 \u5c0f\u7ea2\u95e8\u4e61\u515a\u7fa4\u670d\u52a1\u4e2d\u5fc3");
+        }
+        previewEtaText.setText(text.toString());
     }
 
     private void applyOverlayPreviewPanelStyle() {
@@ -1789,7 +2467,7 @@ public class MainActivity extends Activity {
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(dp(7));
         int opacity = AppPrefs.getBackgroundOpacityPercent(this);
-        bg.setColor(AppPrefs.withAlpha(0xFF111827, opacity));
+        bg.setColor(AppPrefs.withAlpha(AppPrefs.getBackgroundColor(this), opacity));
         bg.setStroke(dp(1), AppPrefs.withAlpha(0xFFFFFFFF, AppPrefs.strokeOpacityForBackground(opacity)));
         return bg;
     }
@@ -1801,16 +2479,25 @@ public class MainActivity extends Activity {
     }
 
     private String overlayUiStyleButtonText() {
-        return "\u60ac\u6d6e\u7a97\u6837\u5f0f\uff1a" + OverlayUiStyles.displayName(AppPrefs.getOverlayUiStyle(this));
+        return "悬浮窗样式：" + overlayStyleDisplayName(AppPrefs.getOverlayUiStyle(this));
     }
 
     private void chooseOverlayUiStyle() {
         String currentStyle = AppPrefs.getOverlayUiStyle(this);
-        int checked = OverlayUiStyles.indexOf(currentStyle);
+        ArrayList<OverlayStyleChoice> choices = overlayStyleChoices();
+        String[] labels = new String[choices.size()];
+        int checked = 0;
+        for (int i = 0; i < choices.size(); i++) {
+            OverlayStyleChoice choice = choices.get(i);
+            labels[i] = choice.label;
+            if (choice.id.equals(currentStyle)) {
+                checked = i;
+            }
+        }
         new AlertDialog.Builder(this)
-                .setTitle("\u9009\u62e9\u60ac\u6d6e\u7a97\u6837\u5f0f")
-                .setSingleChoiceItems(OverlayUiStyles.labels(), checked, (dialog, which) -> {
-                    String style = OverlayUiStyles.ALL[which].id;
+                .setTitle("选择悬浮窗样式")
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    String style = choices.get(which).id;
                     saveOverlayUiStyle(style);
                     applyOverlayPreviewStyle();
                     notifyOverlayStyleChanged();
@@ -1818,6 +2505,61 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("\u53d6\u6d88", null)
                 .show();
+    }
+
+    private ArrayList<OverlayStyleChoice> overlayStyleChoices() {
+        ArrayList<OverlayStyleChoice> choices = new ArrayList<>();
+        for (OverlayUiStyles.Style style : OverlayUiStyles.ALL) {
+            choices.add(new OverlayStyleChoice(style.id, shortOverlayStyleLabel(style)));
+        }
+        ArrayList<PluginManifest> plugins = PluginManager.installedPlugins(this);
+        for (PluginManifest plugin : plugins) {
+            if (plugin.hasCapability(PluginManifest.CAP_OVERLAY_STYLE)) {
+                choices.add(new OverlayStyleChoice(
+                        OverlayUiStyles.pluginStyleId(plugin.id),
+                        "插件：" + plugin.name + "（" + plugin.versionName + "）"));
+            }
+        }
+        return choices;
+    }
+
+    private String shortOverlayStyleLabel(OverlayUiStyles.Style style) {
+        if (OverlayUiStyles.OLD.equals(style.id)) return "经典";
+        if (OverlayUiStyles.CARD.equals(style.id)) return "卡片";
+        if (OverlayUiStyles.DYNAMIC_ISLAND_FULL.equals(style.id)) return "灵动岛";
+        if (OverlayUiStyles.NEW.equals(style.id)) return "新 UI（测试）";
+        return style.displayName;
+    }
+
+    private String overlayStyleDisplayName(String style) {
+        String normalized = OverlayUiStyles.normalize(style);
+        if (OverlayUiStyles.isPluginStyle(normalized)) {
+            String pluginId = OverlayUiStyles.pluginIdFromStyle(normalized);
+            PluginManifest plugin = installedPluginById(pluginId);
+            if (plugin != null && plugin.hasCapability(PluginManifest.CAP_OVERLAY_STYLE)) {
+                return plugin.name + "（插件）";
+            }
+            return "插件样式（不可用：" + pluginId + "）";
+        }
+        return OverlayUiStyles.displayName(normalized);
+    }
+
+    private PluginManifest installedPluginById(String pluginId) {
+        if (TextUtils.isEmpty(pluginId)) {
+            return null;
+        }
+        for (PluginManifest plugin : PluginManager.installedPlugins(this)) {
+            if (pluginId.equals(plugin.id)) {
+                return plugin;
+            }
+        }
+        return null;
+    }
+
+    private boolean isPluginOverlayStyleSelected(String pluginId) {
+        String selectedStyle = AppPrefs.getOverlayUiStyle(this);
+        return OverlayUiStyles.isPluginStyle(selectedStyle)
+                && pluginId.equals(OverlayUiStyles.pluginIdFromStyle(selectedStyle));
     }
 
     private void chooseTextMode() {
@@ -1842,6 +2584,16 @@ public class MainActivity extends Activity {
         getSharedPreferences(AppPrefs.PREFS, MODE_PRIVATE)
                 .edit()
                 .putString(AppPrefs.KEY_TEXT_MODE, AppPrefs.TEXT_MODE_AUTO.equals(mode) ? AppPrefs.TEXT_MODE_AUTO : AppPrefs.TEXT_MODE_LIGHT)
+                .putBoolean(AppPrefs.KEY_CUSTOM_TEXT_COLOR_ENABLED, false)
+                .apply();
+        updateTextColorText(false);
+    }
+
+    private void saveTextColor(int color) {
+        getSharedPreferences(AppPrefs.PREFS, MODE_PRIVATE)
+                .edit()
+                .putBoolean(AppPrefs.KEY_CUSTOM_TEXT_COLOR_ENABLED, true)
+                .putInt(AppPrefs.KEY_TEXT_COLOR, AppPrefs.normalizeBackgroundColor(color))
                 .apply();
     }
 
@@ -1850,18 +2602,36 @@ public class MainActivity extends Activity {
                 .edit()
                 .putString(AppPrefs.KEY_OVERLAY_UI_STYLE, OverlayUiStyles.normalize(style))
                 .apply();
+        if (overlayStyleChoicesContainer != null) {
+            refreshStyleChoices(overlayStyleChoicesContainer);
+        }
     }
 
     private int previewPrimaryTextColor() {
+        if (AppPrefs.isCustomTextColorEnabled(this)) {
+            return AppPrefs.getTextColor(this);
+        }
         return AppPrefs.usesDarkTextPalette(this) ? 0xFF0F172A : 0xFFE8EAED;
     }
 
     private int previewAlertTextColor() {
+        if (AppPrefs.isCustomTextColorEnabled(this)) {
+            return AppPrefs.getTextColor(this);
+        }
         return AppPrefs.usesDarkTextPalette(this) ? 0xFF7C2D12 : 0xFFFFF7ED;
     }
 
     private int previewDetailTextColor() {
+        if (AppPrefs.isCustomTextColorEnabled(this)) {
+            return AppPrefs.getTextColor(this);
+        }
         return AppPrefs.usesDarkTextPalette(this) ? 0xFF1E3A8A : 0xFFC7D2FE;
+    }
+
+    private void updateTextColorText(boolean customEnabled) {
+        if (overlayTextColorText != null) {
+            overlayTextColorText.setText(customEnabled ? "\u6587\u5b57\u989c\u8272\uff1a\u81ea\u5b9a\u4e49" : "\u6587\u5b57\u989c\u8272\uff1a\u8ddf\u968f\u6587\u5b57\u6a21\u5f0f");
+        }
     }
 
     private void updateBackgroundOpacityText(int percent) {
@@ -1945,6 +2715,13 @@ public class MainActivity extends Activity {
         sendBroadcast(intent);
     }
 
+    private void notifyPluginsChanged() {
+        startOverlayService(this);
+        Intent intent = new Intent(AppPrefs.ACTION_PLUGINS_CHANGED);
+        intent.setPackage(getPackageName());
+        sendBroadcast(intent);
+    }
+
     private void notifyDisplayPolicyChanged() {
         Intent intent = new Intent(AppPrefs.ACTION_DISPLAY_POLICY_CHANGED);
         intent.setPackage(getPackageName());
@@ -1969,7 +2746,7 @@ public class MainActivity extends Activity {
 
     private void updateClusterScaleText(int percent) {
         if (clusterScaleText != null) {
-            clusterScaleText.setText("\u526f\u5c4f\u5927\u5c0f " + AppPrefs.clampOverlayScalePercent(percent) + "%");
+            clusterScaleText.setText("\u526f\u5c4f\u60ac\u6d6e\u7a97\u5927\u5c0f " + AppPrefs.clampOverlayScalePercent(percent) + "%");
         }
     }
 
@@ -2043,6 +2820,69 @@ public class MainActivity extends Activity {
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private final class PluginMarketAdapter extends BaseAdapter {
+        private final ArrayList<PluginRepository.MarketPlugin> plugins;
+
+        PluginMarketAdapter(ArrayList<PluginRepository.MarketPlugin> plugins) {
+            this.plugins = plugins;
+        }
+
+        @Override
+        public int getCount() {
+            return plugins.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return plugins.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            PluginRepository.MarketPlugin plugin = plugins.get(position);
+            LinearLayout root = new LinearLayout(MainActivity.this);
+            root.setOrientation(LinearLayout.VERTICAL);
+            root.setPadding(dp(18), dp(12), dp(18), dp(12));
+
+            TextView title = new TextView(MainActivity.this);
+            title.setText(plugin.name + "  " + plugin.versionName);
+            title.setTextSize(16f);
+            title.setTypeface(Typeface.DEFAULT_BOLD);
+            title.setTextColor(0xFF111827);
+            title.setSingleLine(true);
+            title.setEllipsize(TextUtils.TruncateAt.END);
+            root.addView(title, new LinearLayout.LayoutParams(-1, -2));
+
+            TextView meta = new TextView(MainActivity.this);
+            String developer = TextUtils.isEmpty(plugin.developerName) ? "未知开发者" : plugin.developerName;
+            meta.setText(developer + " · " + plugin.capabilitiesLabel + " · " + formatBytes(plugin.size));
+            meta.setTextSize(12f);
+            meta.setTextColor(0xFF64748B);
+            LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
+            metaLp.setMargins(0, dp(4), 0, 0);
+            root.addView(meta, metaLp);
+
+            if (!TextUtils.isEmpty(plugin.description)) {
+                TextView desc = new TextView(MainActivity.this);
+                desc.setText(plugin.description);
+                desc.setTextSize(13f);
+                desc.setTextColor(0xFF334155);
+                desc.setMaxLines(2);
+                desc.setEllipsize(TextUtils.TruncateAt.END);
+                LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(-1, -2);
+                descLp.setMargins(0, dp(6), 0, 0);
+                root.addView(desc, descLp);
+            }
+            FontManager.applyToViewTree(MainActivity.this, root);
+            return root;
+        }
     }
 
     private final class TargetAppAdapter extends BaseAdapter {
@@ -2154,6 +2994,16 @@ public class MainActivity extends Activity {
             lp.setMargins(0, 0, dp(6), 0);
             tag.setLayoutParams(lp);
             return tag;
+        }
+    }
+
+    private static final class OverlayStyleChoice {
+        final String id;
+        final String label;
+
+        OverlayStyleChoice(String id, String label) {
+            this.id = id;
+            this.label = label;
         }
     }
 

@@ -1,0 +1,103 @@
+{
+  "root": {
+    "type": "column",
+    "padding": 10,
+    "background": "#D9111827",
+    "strokeColor": "#33FFFFFF",
+    "strokeWidth": 1,
+    "cornerRadius": 14,
+    "children": [
+      {
+        "type": "row",
+        "gravity": "center_vertical",
+        "children": [
+          {
+            "type": "badge",
+            "bind": "mode",
+            "textSize": 12,
+            "background": "#334F46E5",
+            "textColor": "#FFFFFFFF",
+            "paddingLeft": 8,
+            "paddingRight": 8,
+            "paddingTop": 3,
+            "paddingBottom": 3
+          },
+          {
+            "type": "text",
+            "bind": "roadName",
+            "textSize": 14,
+            "bold": true,
+            "singleLine": true,
+            "textColor": "#FFE8EAED",
+            "marginLeft": 8
+          }
+        ]
+      },
+      {
+        "type": "row",
+        "gravity": "center_vertical",
+        "marginTop": 8,
+        "visibleWhen": "turnIcon",
+        "children": [
+          {
+            "type": "turnIcon",
+            "width": 42,
+            "height": 42,
+            "marginRight": 8
+          },
+          {
+            "type": "column",
+            "children": [
+              {
+                "type": "text",
+                "bind": "turnRoad",
+                "textSize": 15,
+                "bold": true,
+                "singleLine": true,
+                "textColor": "#FFFFFFFF"
+              },
+              {
+                "type": "text",
+                "bind": "turnDistance",
+                "textSize": 13,
+                "textColor": "#FFBFDBFE",
+                "singleLine": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "row",
+        "gravity": "center_vertical",
+        "marginTop": 8,
+        "children": [
+          {
+            "type": "trafficLights",
+            "marginRight": 6
+          },
+          {
+            "type": "laneBar",
+            "background": true,
+            "dividers": true
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "bind": "eta",
+        "visibleWhen": "eta",
+        "textSize": 13,
+        "textColor": "#FFC7D2FE",
+        "marginTop": 6
+      },
+      {
+        "type": "edog",
+        "visibleWhen": "alert",
+        "textSize": 12,
+        "textColor": "#FFFFF7ED",
+        "marginTop": 4
+      }
+    ]
+  }
+}

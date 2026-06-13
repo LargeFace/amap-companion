@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "example.overlay.signal.rail",
+  "name": "信号轨道外观",
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "developer": {
+    "name": "AMap Companion 示例",
+    "homepage": "https://github.com/zuo-qirun/amap-companion"
+  },
+  "capabilities": ["overlayStyle"],
+  "entry": {
+    "overlayStyle": "ui/appearance.json"
+  },
+  "minAppVersionCode": 1,
+  "description": "深色横向仪表样式，突出下一动作、道路、红绿灯和车道信息。安装后可在悬浮窗样式列表中选择。"
+}

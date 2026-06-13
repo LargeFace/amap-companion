@@ -8,6 +8,14 @@ release.keystore
 update_server/public/apk/*.apk
 update_server/public/update.json
 update_server/public/CHANGELOG.md
+update_server/public/plugins.json
 update_server/state/
+update_server/admin_users.json
+update_server/developer_users.json
+update_server/plugin_submissions/
+update_server/node_modules/
+update_server/.env
+logs/
+window.xml
 .claude/
 CLAUDE.md

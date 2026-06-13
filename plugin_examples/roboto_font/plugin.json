@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "example.font.roboto",
+  "name": "Roboto 字体示例",
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "developer": {
+    "name": "AMap Companion 示例",
+    "homepage": "https://github.com/zuo-qirun/amap-companion"
+  },
+  "capabilities": ["font"],
+  "entry": {
+    "font": "fonts/main.ttf"
+  },
+  "minAppVersionCode": 1,
+  "description": "使用 Apache 2.0 许可 Roboto Regular 的字体插件示例。"
+}

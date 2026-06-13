@@ -1,0 +1,1 @@
+Add the image files referenced by icons.json to this directory.

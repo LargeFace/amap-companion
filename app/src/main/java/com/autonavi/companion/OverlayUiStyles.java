@@ -12,14 +12,13 @@ public final class OverlayUiStyles {
     public static final String OLD = "old";
     public static final String NEW = "new";
     public static final String DYNAMIC_ISLAND_FULL = "dynamic_island_full";
-    public static final String DYNAMIC_ISLAND_TEST = "dynamic_island";
     public static final String CARD = "card";
+    public static final String PLUGIN_PREFIX = "plugin:";
 
     public static final Style[] ALL = {
             new Style(OLD, "\u7ecf\u5178 UI\uff08\u9ed8\u8ba4\uff09", "\u7ecf\u5178 UI\uff08\u9ed8\u8ba4\uff09", false),
             new Style(CARD, "\u5361\u7247 UI", "\u5361\u7247 UI", true),
             new Style(DYNAMIC_ISLAND_FULL, "\u7075\u52a8\u5c9b", "\u7075\u52a8\u5c9b", true),
-            new Style(DYNAMIC_ISLAND_TEST, "\u7075\u52a8\u5c9b\uff08\u6d4b\u8bd5\uff09", "\u7075\u52a8\u5c9b\uff08\u6d4b\u8bd5\uff09", true),
             new Style(NEW, "\u65b0 UI\uff08\u5361\u7247\u6837\u5f0f\uff0c\u6d4b\u8bd5\u4e2d\uff09", "\u65b0 UI\uff08\u6d4b\u8bd5\u4e2d\uff09", true)
     };
 
@@ -27,8 +26,11 @@ public final class OverlayUiStyles {
     }
 
     public static String normalize(String styleId) {
-        if ("dynamic_island_full".equals(styleId)) {
+        if ("dynamic_island_full".equals(styleId) || "dynamic_island".equals(styleId)) {
             return DYNAMIC_ISLAND_FULL;
+        }
+        if (isPluginStyle(styleId)) {
+            return styleId;
         }
         for (Style style : ALL) {
             if (style.id.equals(styleId)) {
@@ -39,6 +41,9 @@ public final class OverlayUiStyles {
     }
 
     public static boolean isCardLike(String styleId) {
+        if (isPluginStyle(styleId)) {
+            return false;
+        }
         return find(styleId).cardLike;
     }
 
@@ -62,6 +67,34 @@ public final class OverlayUiStyles {
 
     public static String displayName(String styleId) {
         return find(styleId).displayName;
+    }
+
+    public static String pluginStyleId(String pluginId) {
+        try {
+            PluginManifest.validatePluginId(pluginId);
+            return PLUGIN_PREFIX + pluginId;
+        } catch (Throwable ignored) {
+            return OLD;
+        }
+    }
+
+    public static boolean isPluginStyle(String styleId) {
+        if (styleId == null || !styleId.startsWith(PLUGIN_PREFIX)) {
+            return false;
+        }
+        try {
+            PluginManifest.validatePluginId(pluginIdFromStyle(styleId));
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    public static String pluginIdFromStyle(String styleId) {
+        if (styleId == null || !styleId.startsWith(PLUGIN_PREFIX)) {
+            return "";
+        }
+        return styleId.substring(PLUGIN_PREFIX.length());
     }
 
     private static Style find(String styleId) {

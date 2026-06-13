@@ -296,10 +296,8 @@ public class LaneBarView extends View {
         if (laneCode < 0) {
             return false;
         }
-        String resourceName = laneCode <= 48
-                ? "lane_pdf_" + laneCode
-                : "lane_special_unknown";
-        float resourceScale = laneCode <= 48 ? 1f : 0.85f;
+        String resourceName = laneBitmapResourceName(laneCode);
+        float resourceScale = 1f;
         Bitmap bitmap = loadLaneBitmap(resourceName);
         if (bitmap == null) {
             return false;
@@ -371,7 +369,8 @@ public class LaneBarView extends View {
         Rect bounds;
         if (!useCommonBitmapCrop) {
             bounds = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
-        } else if (hasCommonLaneSourceBounds
+        } else if (!"unlined".equals(resourceName)
+                && hasCommonLaneSourceBounds
                 && commonLaneSourceBounds.right <= bitmap.getWidth()
                 && commonLaneSourceBounds.bottom <= bitmap.getHeight()) {
             bounds = new Rect(commonLaneSourceBounds);
@@ -407,10 +406,14 @@ public class LaneBarView extends View {
         int width = -1;
         int height = -1;
         for (int lane : lanes) {
-            if (lane < 0 || lane > 48) {
+            if (lane < 0) {
                 continue;
             }
-            Bitmap bitmap = loadLaneBitmap("lane_pdf_" + lane);
+            String resourceName = laneBitmapResourceName(lane);
+            if ("unlined".equals(resourceName)) {
+                continue;
+            }
+            Bitmap bitmap = loadLaneBitmap(resourceName);
             if (bitmap == null) {
                 continue;
             }
@@ -437,6 +440,22 @@ public class LaneBarView extends View {
                 Math.min(height, height - minBottom + insetY)
         );
         hasCommonLaneSourceBounds = !commonLaneSourceBounds.isEmpty();
+    }
+
+    private String laneBitmapResourceName(int laneCode) {
+        if (laneCode >= 0 && laneCode <= 48) {
+            return "lane_pdf_" + laneCode;
+        }
+        if (laneCode == 62) {
+            return "global_image_auto_landback_17";
+        }
+        if (laneCode == 85) {
+            return "global_image_auto_landback_150";
+        }
+        if (laneCode == 89) {
+            return "unlined";
+        }
+        return "global_image_auto_landback_149";
     }
 
     private int[] laneBitmapTransparentInsets(Bitmap bitmap) {

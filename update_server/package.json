@@ -6,9 +6,20 @@
   "scripts": {
     "start": "node server.js",
     "sync": "node sync-build.js",
-    "sync:force": "node sync-build.js --force"
+    "sync:force": "node sync-build.js --force",
+    "admin:user": "node admin-user.js",
+    "plugin:pack": "node package-plugin.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "busboy": "^1.6.0",
+    "dotenv": "^17.4.2",
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "yazl": "^3.3.1"
   }
 }

@@ -223,9 +223,9 @@ public final class ServiceAreaParser {
 
     private static String formatDistance(int meters) {
         if (meters >= 1000) {
-            return String.format(Locale.US, "%.1f公里", meters / 1000f);
+            return String.format(Locale.US, "%.1fkm", meters / 1000f);
         }
-        return meters + "米";
+        return meters + "m";
     }
 
     private static Object safeExtra(Bundle extras, String key) {

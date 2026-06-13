@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "plugins": [
+    {
+      "id": "example.clean.dashboard",
+      "name": "简洁仪表风格",
+      "versionCode": 2,
+      "versionName": "1.1.0",
+      "developer": {
+        "name": "AMap Companion 示例",
+        "homepage": "https://amap-companion.zuoqirun.top"
+      },
+      "capabilities": ["icons", "ui", "overlayStyle"],
+      "description": "声明式 UI 模板和悬浮窗样式示例，可作为插件开发起点。",
+      "minAppVersionCode": 1,
+      "path": "plugins/example.clean.dashboard-2.acplugin"
+    },
+    {
+      "id": "example.font.roboto",
+      "name": "Roboto 字体示例",
+      "versionCode": 1,
+      "versionName": "1.0.0",
+      "developer": {
+        "name": "AMap Companion 示例",
+        "homepage": "https://github.com/zuo-qirun/amap-companion"
+      },
+      "capabilities": ["font"],
+      "description": "使用 Apache 2.0 许可 Roboto Regular 的字体插件示例。",
+      "minAppVersionCode": 1,
+      "path": "plugins/example.font.roboto-1.acplugin"
+    }
+  ]
+}

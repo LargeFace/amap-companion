@@ -21,6 +21,10 @@ public class BootReceiver extends BroadcastReceiver {
         if (!isAutoStartEvent) {
             return;
         }
+        if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
+            Log.d(TAG, "defer overlay service start until app launch or next screen event after package replacement");
+            return;
+        }
         if (!AppPrefs.isAutoStartEnabled(context)) {
             Log.d(TAG, "skip auto starting overlay service after " + action);
             return;

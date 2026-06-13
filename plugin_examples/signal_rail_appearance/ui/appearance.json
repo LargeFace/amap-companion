@@ -1,0 +1,152 @@
+{
+  "root": {
+    "type": "column",
+    "width": "wrap",
+    "paddingLeft": 12,
+    "paddingTop": 10,
+    "paddingRight": 12,
+    "paddingBottom": 9,
+    "background": "#F0101518",
+    "strokeColor": "#667A8B8C",
+    "strokeWidth": 1,
+    "cornerRadius": 12,
+    "children": [
+      {
+        "type": "row",
+        "width": "match",
+        "gravity": "center_vertical",
+        "children": [
+          {
+            "type": "badge",
+            "bind": "mode",
+            "textSize": 11,
+            "bold": true,
+            "background": "#FF176B4D",
+            "textColor": "#FFFFFFFF",
+            "paddingLeft": 8,
+            "paddingTop": 3,
+            "paddingRight": 8,
+            "paddingBottom": 3
+          },
+          {
+            "type": "text",
+            "bind": "roadName",
+            "width": 0,
+            "weight": 1,
+            "marginLeft": 8,
+            "textSize": 14,
+            "bold": true,
+            "singleLine": true,
+            "textColor": "#FFF4F7F5"
+          },
+          {
+            "type": "badge",
+            "text": "{currentSpeed}",
+            "visibleWhen": "currentSpeed",
+            "hideWhenEmpty": true,
+            "marginLeft": 8,
+            "textSize": 12,
+            "bold": true,
+            "background": "#FF26343A",
+            "strokeColor": "#66738A91",
+            "strokeWidth": 1,
+            "textColor": "#FFFFFFFF",
+            "paddingLeft": 7,
+            "paddingTop": 3,
+            "paddingRight": 7,
+            "paddingBottom": 3
+          }
+        ]
+      },
+      {
+        "type": "row",
+        "width": "match",
+        "gravity": "center_vertical",
+        "marginTop": 9,
+        "visibleWhen": "turnIcon",
+        "children": [
+          {
+            "type": "turnIcon",
+            "width": 46,
+            "height": 46,
+            "marginRight": 10
+          },
+          {
+            "type": "column",
+            "width": 0,
+            "weight": 1,
+            "children": [
+              {
+                "type": "text",
+                "bind": "turnRoad",
+                "textSize": 16,
+                "bold": true,
+                "singleLine": true,
+                "textColor": "#FFFFFFFF"
+              },
+              {
+                "type": "text",
+                "text": "{turnDistance}  {turnText}",
+                "textSize": 12,
+                "singleLine": true,
+                "textColor": "#FF9FD8BF",
+                "marginTop": 2
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "bind": "eta",
+            "visibleWhen": "eta",
+            "marginLeft": 10,
+            "textSize": 12,
+            "singleLine": true,
+            "textColor": "#FFFFD28A"
+          }
+        ]
+      },
+      {
+        "type": "row",
+        "width": "match",
+        "gravity": "center_vertical",
+        "marginTop": 9,
+        "paddingLeft": 7,
+        "paddingTop": 5,
+        "paddingRight": 7,
+        "paddingBottom": 5,
+        "background": "#CC192126",
+        "strokeColor": "#405E6F73",
+        "strokeWidth": 1,
+        "cornerRadius": 8,
+        "children": [
+          {
+            "type": "trafficLights",
+            "marginRight": 7
+          },
+          {
+            "type": "laneBar",
+            "weight": 1,
+            "background": false,
+            "dividers": true
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "bind": "detail",
+        "visibleWhen": "detail",
+        "marginTop": 6,
+        "textSize": 11,
+        "singleLine": true,
+        "textColor": "#FF9DAAAF"
+      },
+      {
+        "type": "edog",
+        "visibleWhen": "alert",
+        "marginTop": 5,
+        "textSize": 11,
+        "textColor": "#FFFFE5B4"
+      }
+    ]
+  }
+}

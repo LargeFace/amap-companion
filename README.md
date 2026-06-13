@@ -85,6 +85,45 @@ update_server/
 update_server/README.md
 ```
 
+## 插件市场与本地 DIY 插件
+
+应用支持声明式 `.acplugin` 插件包，用于扩展字体、图标资源、UI 模板和悬浮窗样式。插件包本质是 ZIP，不执行第三方 Java/JS 代码。
+
+最小 `plugin.json`：
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "example.clean.dashboard",
+  "name": "简洁仪表风格",
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "developer": {
+    "name": "开发者名称",
+    "homepage": "https://example.com"
+  },
+  "capabilities": ["font", "icons", "ui", "overlayStyle"],
+  "entry": {
+    "font": "fonts/main.ttf",
+    "icons": "icons/icons.json",
+    "ui": "ui/dashboard.json",
+    "overlayStyle": "ui/dashboard.json"
+  },
+  "minAppVersionCode": 1,
+  "description": "插件简介"
+}
+```
+
+插件优先安装到公共目录 `/sdcard/amap_companion/plugins/{pluginId}/`；设备未授予存储权限或公共目录不可写时，自动改用应用私有目录 `files/plugins/{pluginId}/`。应用会同时读取两处目录。字体、图标和 UI 模板三类能力可分别混搭启用；同类只会启用一个插件。`overlayStyle` 会作为“悬浮窗样式”列表中的一个新样式出现，选中后按该插件模板渲染。旧的 `/sdcard/amap_companion/diy/` 字体和巡航箭头仍保留为低优先级兼容层。
+
+UI 模板支持固定组件：`column`、`row`、`text`、`image`、`badge`、`turnIcon`、`laneBar`、`trafficLights`、`edog`、`spacer`。文本可绑定 `mode`、`roadName`、`heading`、`turnText`、`turnDistance`、`turnRoad`、`turnIcon`、`eta`、`alert`、`detail`、`limitSpeed`、`currentSpeed`、`cameraType` 和 `raw.keyType`。
+
+示例插件源码见：
+
+```text
+plugin_examples/clean_dashboard/
+```
+
 ## 更新日志
 
 项目更新日志见：

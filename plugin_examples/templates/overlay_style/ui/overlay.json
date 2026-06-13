@@ -1,0 +1,47 @@
+{
+  "root": {
+    "type": "row",
+    "gravity": "center_vertical",
+    "paddingLeft": 12,
+    "paddingRight": 12,
+    "paddingTop": 8,
+    "paddingBottom": 8,
+    "background": "#E613181C",
+    "strokeColor": "#59FFFFFF",
+    "strokeWidth": 1,
+    "cornerRadius": 18,
+    "children": [
+      {
+        "type": "turnIcon",
+        "width": 38,
+        "height": 38,
+        "visibleWhen": "turnIcon",
+        "marginRight": 8
+      },
+      {
+        "type": "column",
+        "children": [
+          {
+            "type": "text",
+            "bind": "turnRoad",
+            "textSize": 14,
+            "bold": true,
+            "singleLine": true,
+            "textColor": "#FFFFFFFF"
+          },
+          {
+            "type": "text",
+            "text": "{turnDistance} · {eta}",
+            "textSize": 12,
+            "textColor": "#FFC7D2D9",
+            "marginTop": 2
+          }
+        ]
+      },
+      {
+        "type": "trafficLights",
+        "marginLeft": 10
+      }
+    ]
+  }
+}

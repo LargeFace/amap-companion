@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "example.overlay.compact.pill",
+  "name": "紧凑胶囊悬浮窗",
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "developer": {
+    "name": "AMap Companion 示例",
+    "homepage": "https://github.com/zuo-qirun/amap-companion"
+  },
+  "capabilities": ["overlayStyle"],
+  "entry": {
+    "overlayStyle": "ui/overlay.json"
+  },
+  "minAppVersionCode": 1,
+  "description": "紧凑胶囊布局，可在悬浮窗样式列表中直接选择。"
+}

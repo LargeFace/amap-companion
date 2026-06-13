@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "example.ui.green.dashboard",
+  "name": "绿色仪表 UI",
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "developer": {
+    "name": "AMap Companion 示例",
+    "homepage": "https://github.com/zuo-qirun/amap-companion"
+  },
+  "capabilities": ["ui"],
+  "entry": {
+    "ui": "ui/main.json"
+  },
+  "minAppVersionCode": 1,
+  "description": "绿色仪表风格的声明式主界面 UI 插件。"
+}

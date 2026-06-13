@@ -37,11 +37,16 @@ public final class AppPrefs {
     public static final String KEY_SHOW_LIGHT                   = "show_light";
     public static final String KEY_SHOW_SERVICE_AREA            = "show_service_area";
     public static final String KEY_SHOW_ETA                     = "show_eta";
+    public static final String KEY_SHOW_DESTINATION             = "show_destination";
     public static final String KEY_SHOW_ALERT                   = "show_alert";
     public static final String KEY_SHOW_DETAIL                  = "show_detail";
+    public static final String KEY_SHOW_TMC_BAR                 = "show_tmc_bar";
     public static final String KEY_TRANSPARENT_BACKGROUND       = "transparent_background";
     public static final String KEY_BACKGROUND_OPACITY_PERCENT   = "background_opacity_percent";
+    public static final String KEY_BACKGROUND_COLOR             = "background_color";
     public static final String KEY_TEXT_MODE                    = "text_mode";
+    public static final String KEY_CUSTOM_TEXT_COLOR_ENABLED    = "custom_text_color_enabled";
+    public static final String KEY_TEXT_COLOR                   = "text_color";
     public static final String KEY_OVERLAY_UI_STYLE             = "overlay_ui_style";
     public static final String KEY_AUTO_START_ENABLED           = "auto_start_enabled";
     public static final String KEY_START_SERVICE_ON_APP_OPEN    = "start_service_on_app_open";
@@ -51,6 +56,9 @@ public final class AppPrefs {
     public static final String KEY_HIDE_CLUSTER_WHEN_INACTIVE   = "hide_cluster_when_inactive";
     public static final String KEY_OVERSPEED_MILD_WARNING       = "overspeed_mild_warning";
     public static final String KEY_OVERSPEED_MEDIUM_WARNING     = "overspeed_medium_warning";
+    public static final String KEY_PLUGIN_FONT_ID               = "plugin_font_id";
+    public static final String KEY_PLUGIN_ICONS_ID              = "plugin_icons_id";
+    public static final String KEY_PLUGIN_UI_ID                 = "plugin_ui_id";
 
     // ── Broadcast actions ────────────────────────────────────────────────
     public static final String ACTION_MAIN_OVERLAY_CHANGED      = "com.autonavi.companion.MAIN_OVERLAY_CHANGED";
@@ -60,6 +68,7 @@ public final class AppPrefs {
     public static final String ACTION_OVERLAY_CONTENT_CHANGED   = "com.autonavi.companion.OVERLAY_CONTENT_CHANGED";
     public static final String ACTION_OVERLAY_STYLE_CHANGED     = "com.autonavi.companion.OVERLAY_STYLE_CHANGED";
     public static final String ACTION_DISPLAY_POLICY_CHANGED    = "com.autonavi.companion.DISPLAY_POLICY_CHANGED";
+    public static final String ACTION_PLUGINS_CHANGED           = "com.autonavi.companion.PLUGINS_CHANGED";
 
     // ── UI style values ──────────────────────────────────────────────────
     public static final String DEFAULT_TARGET_PACKAGE           = "com.autonavi.amapClone";
@@ -68,13 +77,24 @@ public final class AppPrefs {
     public static final String OVERLAY_UI_OLD                   = OverlayUiStyles.OLD;
     public static final String OVERLAY_UI_NEW                   = OverlayUiStyles.NEW;
     public static final String OVERLAY_UI_DYNAMIC_ISLAND        = OverlayUiStyles.DYNAMIC_ISLAND_FULL;
-    public static final String OVERLAY_UI_DYNAMIC_ISLAND_TEST   = OverlayUiStyles.DYNAMIC_ISLAND_TEST;
     public static final String OVERLAY_UI_CARD                  = OverlayUiStyles.CARD;
 
     // ── Scale / opacity bounds ───────────────────────────────────────────
     public static final int MIN_BACKGROUND_OPACITY_PERCENT      = 0;
-    public static final int MAX_BACKGROUND_OPACITY_PERCENT      = 90;
+    public static final int MAX_BACKGROUND_OPACITY_PERCENT      = 100;
     public static final int DEFAULT_BACKGROUND_OPACITY_PERCENT  = 90;
+    public static final int DEFAULT_BACKGROUND_COLOR            = 0xFF111827;
+    public static final int DEFAULT_TEXT_COLOR                  = 0xFFE8EAED;
+    public static final int[] BACKGROUND_COLOR_PRESETS = {
+            0xFF111827,
+            0xFF1E293B,
+            0xFF0F3D3E,
+            0xFF064E3B,
+            0xFF1F3A5F,
+            0xFF172554,
+            0xFF312E41,
+            0xFF3A3328
+    };
     public static final int MIN_OVERLAY_SCALE_PERCENT           = 30;
     public static final int MAX_OVERLAY_SCALE_PERCENT           = 300;
     public static final int DEFAULT_OVERLAY_SCALE_PERCENT       = 200;
@@ -166,13 +186,13 @@ public final class AppPrefs {
     }
 
     public static int getClusterX(Context context, int defaultValue) {
-        return Math.max(0, context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getInt(KEY_CLUSTER_X, defaultValue));
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getInt(KEY_CLUSTER_X, defaultValue);
     }
 
     public static int getClusterY(Context context, int defaultValue) {
-        return Math.max(0, context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getInt(KEY_CLUSTER_Y, defaultValue));
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getInt(KEY_CLUSTER_Y, defaultValue);
     }
 
     public static boolean isModeVisible(Context context) {
@@ -199,12 +219,29 @@ public final class AppPrefs {
         return isOverlayContentEnabled(context, KEY_SHOW_ETA);
     }
 
+    public static boolean isDestinationVisible(Context context) {
+        return isOverlayContentEnabled(context, KEY_SHOW_DESTINATION);
+    }
+
+    public static boolean isDestinationSupportedByUiStyle(Context context) {
+        String style = getOverlayUiStyle(context);
+        return OVERLAY_UI_OLD.equals(style) || OVERLAY_UI_NEW.equals(style);
+    }
+
+    public static boolean shouldShowDestination(Context context) {
+        return isDestinationVisible(context) && isDestinationSupportedByUiStyle(context);
+    }
+
     public static boolean isAlertVisible(Context context) {
         return isOverlayContentEnabled(context, KEY_SHOW_ALERT);
     }
 
     public static boolean isDetailVisible(Context context) {
         return isOverlayContentEnabled(context, KEY_SHOW_DETAIL);
+    }
+
+    public static boolean isTmcBarVisible(Context context) {
+        return isOverlayContentEnabled(context, KEY_SHOW_TMC_BAR);
     }
 
     public static boolean isTransparentBackground(Context context) {
@@ -231,12 +268,18 @@ public final class AppPrefs {
         return OVERLAY_UI_DYNAMIC_ISLAND.equals(getOverlayUiStyle(context));
     }
 
-    public static boolean isDynamicIslandTestUiEnabled(Context context) {
-        return OVERLAY_UI_DYNAMIC_ISLAND_TEST.equals(getOverlayUiStyle(context));
-    }
-
     public static boolean usesDarkTextPalette(Context context) {
         return getBackgroundOpacityPercent(context) <= 55 && isAutoTextMode(context);
+    }
+
+    public static boolean isCustomTextColorEnabled(Context context) {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getBoolean(KEY_CUSTOM_TEXT_COLOR_ENABLED, false);
+    }
+
+    public static int getTextColor(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return normalizeBackgroundColor(prefs.getInt(KEY_TEXT_COLOR, DEFAULT_TEXT_COLOR));
     }
 
     public static int getBackgroundOpacityPercent(Context context) {
@@ -248,6 +291,11 @@ public final class AppPrefs {
         return prefs.getBoolean(KEY_TRANSPARENT_BACKGROUND, false)
                 ? MIN_BACKGROUND_OPACITY_PERCENT
                 : DEFAULT_BACKGROUND_OPACITY_PERCENT;
+    }
+
+    public static int getBackgroundColor(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return normalizeBackgroundColor(prefs.getInt(KEY_BACKGROUND_COLOR, DEFAULT_BACKGROUND_COLOR));
     }
 
     public static String getOverlayTextMode(Context context) {
@@ -279,6 +327,10 @@ public final class AppPrefs {
 
     static int clampBackgroundOpacityPercent(int percent) {
         return Math.max(MIN_BACKGROUND_OPACITY_PERCENT, Math.min(MAX_BACKGROUND_OPACITY_PERCENT, percent));
+    }
+
+    static int normalizeBackgroundColor(int color) {
+        return 0xFF000000 | (color & 0x00FFFFFF);
     }
 
     public static int strokeOpacityForBackground(int opacityPercent) {
