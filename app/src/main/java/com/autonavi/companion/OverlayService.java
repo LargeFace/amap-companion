@@ -3130,6 +3130,7 @@ public class OverlayService extends Service {
         currentRawKeyType = intValue(extras, "KEY_TYPE", -1);
 
         ensureOverlay();
+		boolean dayNightChanged = updateDayNightStateFromExtras(extras);
         boolean foregroundChanged = updateTargetForegroundFromExtras(extras);
         boolean navigationActivityChanged = updateNavigationActivityFromExtras(extras);
         boolean displayPolicyChanged = targetBroadcastChanged
@@ -3143,6 +3144,10 @@ public class OverlayService extends Service {
         updateLaneFromExtras(extras);
 
         int keyType = currentRawKeyType;
+
+		if (dayNightChanged) {
+            applyTextPalette();
+        }
 
         if (keyType == 13011 || hasAny(extras, "EXTRA_TMC_SEGMENT", "extra_tmc_segment")) {
             updateTmcData(valueString(extras, "EXTRA_TMC_SEGMENT", "extra_tmc_segment"));
@@ -3194,6 +3199,14 @@ public class OverlayService extends Service {
             syncMainOverlayAttachment();
             ensureClusterMirror();
         }
+    }
+
+	private boolean updateDayNightStateFromExtras(Bundle extras) {
+        if (currentRawKeyType != AmapConstants.KEY_TYPE_NAVIGATION_STATE) {
+            return false;
+        }
+        int state = intValue(extras, "EXTRA_STATE", -1);
+        return AppPrefs.updateDayNightState(this, state);
     }
 
     private void handleDiagnosticReplay(Intent intent) {
