@@ -2630,12 +2630,12 @@ public class OverlayService extends Service {
 
     private void refreshPanelVisibility() {
         if (panel != null) {
-            applyOverlayTextOutlines(panel);
+            //applyOverlayTextOutlines(panel);
             panel.setVisibility(hasVisibleChildren(panel) ? View.VISIBLE : View.GONE);
             schedulePanelSizeStabilizer(panel, false);
         }
         if (clusterPanel != null) {
-            applyOverlayTextOutlines(clusterPanel);
+            //applyOverlayTextOutlines(clusterPanel);
             clusterPanel.setVisibility(hasVisibleChildren(clusterPanel) ? View.VISIBLE : View.GONE);
             schedulePanelSizeStabilizer(clusterPanel, true);
         }
@@ -3425,8 +3425,8 @@ public class OverlayService extends Service {
             clusterDetailText.setTextColor(detail);
         }
         applyNavigationTextVisualState();
-        applyOverlayTextOutlines(panel);
-        applyOverlayTextOutlines(clusterPanel);
+        //applyOverlayTextOutlines(panel);
+        //applyOverlayTextOutlines(clusterPanel);
     }
 
     private void applyEdogAlertTextColor(LinearLayout row, int primary) {
