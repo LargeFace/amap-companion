@@ -910,7 +910,7 @@ public class OverlayService extends Service {
 
         TextView navEta = (TextView) card.findViewById(R.id.eta_text);
         navEta.setTextColor(primaryTextColor());
-        navEta.setTextSize(scaledSp(15f, scale));
+        navEta.setTextSize(scaledSp(14f, scale));
         navEta.setPadding(scaledDp(6, scale), 0, 0, 0);
 
         LinearLayout navLaneBox = (LinearLayout) card.findViewById(R.id.lane_section);
@@ -1093,7 +1093,7 @@ public class OverlayService extends Service {
         root.addView(serviceArea, serviceAreaLp);
 
         TextView eta = new TextView(context);
-        eta.setTextSize(scaledSp(15f, scale));
+        eta.setTextSize(scaledSp(14f, scale));
         eta.setSingleLine(false);
         eta.setMaxLines(4);
         eta.setGravity(Gravity.CENTER);
@@ -1232,7 +1232,7 @@ public class OverlayService extends Service {
         serviceAreaLp.setMargins(0, scaledDp(3, scale), 0, 0);
 
         TextView eta = (TextView) root.findViewById(R.id.eta_text);
-        eta.setTextSize(scaledSp(15f, scale));
+        eta.setTextSize(scaledSp(14f, scale));
 
         TextView alert = (TextView) root.findViewById(R.id.alert_text);
         alert.setTextSize(scaledSp(14f, scale));
