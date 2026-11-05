@@ -23,8 +23,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.Process;
 import android.provider.Settings;
 import android.text.TextUtils;
@@ -1871,10 +1869,8 @@ public class MainActivity extends Activity {
                 || AppPrefs.isShowMainWhenTargetForegroundEnabled(this)) {
             startOverlayService(this);
         }
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            startActivity(launch);
-            finish();
-        }, 2000L);
+        startActivity(launch);
+        finish();
         return true;
     }
 
