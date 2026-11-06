@@ -417,6 +417,8 @@ public class OverlayService extends Service {
             requestExitInfo();
             requestTmcInfo();
         }
+		
+		requestAmapDayNightState();
         return START_STICKY;
     }
 
@@ -428,6 +430,20 @@ public class OverlayService extends Service {
         } catch (Throwable ignored) {
         }
         super.onDestroy();
+    }
+
+	private void requestAmapDayNightState() {
+        mainHandler.postDelayed(() -> {
+            try {
+                Intent intent = new Intent();
+                intent.setAction("AUTONAVI_STANDARD_BROADCAST_RECV");
+                intent.putExtra("KEY_TYPE", 13030);
+                intent.putExtra("SOURCE_APP", getPackageName());
+                sendBroadcast(intent);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }, 5000L);
     }
 
     private void shutdownWindowsImmediately() {
