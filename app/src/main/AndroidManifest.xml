@@ -9,7 +9,6 @@
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.GET_TASKS" />
     <uses-permission android:name="android.permission.READ_LOGS" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
@@ -47,16 +46,5 @@
             android:authorities="com.autonavi.companion.apkfileprovider"
             android:exported="false"
             android:grantUriPermissions="true" />
-        <receiver
-            android:name=".BootReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.intent.action.SCREEN_ON" />
-                <action android:name="android.intent.action.USER_PRESENT" />
-            </intent-filter>
-        </receiver>
     </application>
 </manifest>
