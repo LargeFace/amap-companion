@@ -419,7 +419,7 @@ public class OverlayService extends Service {
             requestTmcInfo();
         }
 		
-		requestAmapDayNightState();
+		//requestAmapDayNightState();
         return START_STICKY;
     }
 
