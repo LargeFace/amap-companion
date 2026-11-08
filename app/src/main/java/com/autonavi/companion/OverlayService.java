@@ -44,6 +44,7 @@ import android.view.LayoutInflater;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -440,8 +441,10 @@ public class OverlayService extends Service {
                 intent.putExtra("KEY_TYPE", 13030);
                 intent.putExtra("SOURCE_APP", getPackageName());
                 sendBroadcast(intent);
+				Toast.makeText(this, "向高德地图请求当前昼夜模式...", Toast.LENGTH_SHORT).show();
             } catch (Exception e) {
                 e.printStackTrace();
+				Toast.makeText(this, "向高德地图请求当前昼夜模式失败", Toast.LENGTH_SHORT).show();
             }
         }, 5000L);
     }
